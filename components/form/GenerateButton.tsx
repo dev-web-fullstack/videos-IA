@@ -3,11 +3,15 @@ import Button from "../../components/ui/Button";
 interface GenerateButtonProps {
   onClick: () => void;
   disabled?: boolean;
+  isGenerating?: boolean;
+  label?: string;
 }
 
 export default function GenerateButton({
   onClick,
   disabled = false,
+  isGenerating = false,
+  label = "🎬 Gerar Vídeo",
 }: GenerateButtonProps) {
   return (
     <section>
@@ -15,7 +19,14 @@ export default function GenerateButton({
         onClick={onClick}
         disabled={disabled}
       >
-        🎬 Gerar Vídeo
+        {isGenerating ? (
+          <span className="flex items-center justify-center gap-2">
+            <span className="animate-spin">⏳</span>
+            Gerando vídeo...
+          </span>
+        ) : (
+          label
+        )}
       </Button>
     </section>
   );

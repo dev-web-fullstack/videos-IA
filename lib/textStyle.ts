@@ -1,7 +1,8 @@
 export type TextAlign =
   | "left"
   | "center"
-  | "right";
+  | "right"
+  | "justify";
 
 export interface TextStyle {
 

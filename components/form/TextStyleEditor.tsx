@@ -48,6 +48,10 @@ const alignOptions = [
     value: "right",
     label: "Direita",
   },
+  {
+    value: "justify",
+    label: "Justificado",
+  },
 ];
 
 export default function TextStyleEditor({
@@ -357,4 +361,3 @@ export default function TextStyleEditor({
     </section>
   );
 }
-
