@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 import Header from "../components/layout/Header";
 import Card from "../components/ui/Card";
@@ -57,6 +57,9 @@ export default function Home() {
   const [backgroundAnimation, setBackgroundAnimation] = useState<BackgroundAnimationType>("none");
   const [backgroundPosition, setBackgroundPosition] = useState<BackgroundPosition>("full");
   const [backgroundColor, setBackgroundColor] = useState<string>("#000000");
+
+  // Ref para controlar a barra de progresso
+  const progressBarRef = useRef<any>(null);
 
   //--------------------------------------
   // Estilo
@@ -143,8 +146,12 @@ export default function Home() {
 
       if (data.success) {
         setVideoResult(data);
+        // Finalizar a barra de progresso
+        if (progressBarRef.current?.finish) {
+          progressBarRef.current.finish();
+        }
       } else {
-        // Remova esta linha: console.error("Erro:", data.error);
+        console.error("Erro:", data.error);
         alert(data.error || "Erro ao gerar vídeo");
       }
 
@@ -435,7 +442,11 @@ export default function Home() {
               />
 
               {isGenerating && (
-                <ProgressBar />
+                <ProgressBar
+                  ref={progressBarRef}
+                  duration={videoDuration}
+                  hasAnimation={backgroundAnimation !== "none"} // NOVO
+                />
               )}
 
               <ResultCard

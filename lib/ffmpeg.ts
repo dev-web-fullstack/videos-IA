@@ -4,7 +4,7 @@ import fs from "fs";
 
 import { getVideoConfig } from "./videoConfig";
 import { buildTextLayout } from "./textLayout";
-import { ensureVideoFolder, ensureTempFolder } from "./utils";
+import { ensureVideoFolder, ensureTempFolder, clearAllVideos } from "./utils";
 import { generateBackgroundFilter, BackgroundAnimationType, BackgroundPosition } from "./backgroundAnimations";
 
 import type { TextStyle } from "./textStyle";
@@ -21,11 +21,12 @@ export async function generateVideoFromText(
   backgroundColor: string = "#000000"
 ): Promise<string> {
 
+  clearAllVideos();
+
   const outputDir = ensureVideoFolder();
   const outputFile = `video-${Date.now()}-${Math.random().toString(36).substring(7)}.mp4`;
   const outputPath = path.join(outputDir, outputFile);
 
-  // Remover arquivo se existir
   if (fs.existsSync(outputPath)) {
     try {
       fs.unlinkSync(outputPath);
@@ -46,7 +47,6 @@ export async function generateVideoFromText(
     throw new Error("Texto vazio.");
   }
 
-  // Layout
   const layout = buildTextLayout({
     text: script,
     width,
@@ -56,16 +56,13 @@ export async function generateVideoFromText(
     align: textStyle.align,
   });
 
-  // Escrever arquivo de texto temporário
   const textContent = layout.text;
   fs.writeFileSync(tempTextFile, textContent, "utf-8");
 
-  // Fonte
   const fontFile = config.fontFile
     .replace(/\\/g, "/")
     .replace(/:/g, "\\:");
 
-  // Build do filtro drawtext para o texto
   let drawTextFilter = `drawtext=fontfile='${fontFile}':`;
 
   const textFileEscaped = tempTextFile
@@ -97,7 +94,7 @@ export async function generateVideoFromText(
     drawTextFilter += `boxborderw=${paddingX}:`;
   }
 
-  // Alinhamento
+  // Alinhamento horizontal
   let textAlignValue = "";
   switch (textStyle.align) {
     case "left": textAlignValue = "L"; break;
@@ -108,6 +105,7 @@ export async function generateVideoFromText(
 
   drawTextFilter += `text_align=${textAlignValue}:`;
 
+  // Posição X (horizontal)
   let xPosition = "";
   switch (textStyle.align) {
     case "left": xPosition = `${textStyle.marginX}`; break;
@@ -117,7 +115,23 @@ export async function generateVideoFromText(
   }
 
   drawTextFilter += `x=${xPosition}:`;
-  drawTextFilter += `y=(h-text_h)/2:`;
+
+  // Posição Y (vertical) - NOVO
+  let yPosition = "";
+  switch (textStyle.verticalPosition) {
+    case "top":
+      yPosition = `${textStyle.marginY}`;
+      break;
+    case "bottom":
+      yPosition = `h-text_h-${textStyle.marginY}`;
+      break;
+    case "center":
+    default:
+      yPosition = `(h-text_h)/2`;
+      break;
+  }
+
+  drawTextFilter += `y=${yPosition}:`;
 
   const lineSpacing = Math.round(textStyle.lineSpacing * 0.5);
   drawTextFilter += `line_spacing=${lineSpacing}:`;
@@ -135,15 +149,15 @@ export async function generateVideoFromText(
   console.log("🎨 Fundo:", backgroundAnimation);
   console.log("📍 Posição:", backgroundPosition);
   console.log("🎨 Cor:", backgroundColor);
+  console.log("📐 Alinhamento H:", textStyle.align);
+  console.log("📐 Posição V:", textStyle.verticalPosition);
   console.log("📄 Texto com quebras:");
   console.log(layout.text);
   console.log("📁 Salvando em:", outputPath);
   console.log("==============================\n");
 
   return new Promise((resolve, reject) => {
-    // Se for animação - usar 2 passos
     if (backgroundAnimation !== "none") {
-      // Gerar o filtro de fundo
       const bgFilter = generateBackgroundFilter(
         backgroundAnimation,
         backgroundPosition,
@@ -154,9 +168,6 @@ export async function generateVideoFromText(
         config.fps
       );
 
-      console.log("🎨 Filtro de fundo:", bgFilter);
-
-      // PASSO 1: Criar o fundo animado em um arquivo temporário
       const tempVideoFile = path.join(tempDir, `bg-${Date.now()}.mp4`);
 
       const bgArgs = [
@@ -170,9 +181,6 @@ export async function generateVideoFromText(
         "-crf", "23",
         tempVideoFile,
       ];
-
-      console.log("🔧 Criando fundo animado...");
-      console.log("🔧 Comando:", "ffmpeg " + bgArgs.join(" "));
 
       const bgProcess = spawn("ffmpeg", bgArgs);
 
@@ -196,9 +204,6 @@ export async function generateVideoFromText(
 
       bgProcess.on("close", (bgCode) => {
         if (bgCode === 0 && fs.existsSync(tempVideoFile) && !bgError) {
-          console.log("✅ Fundo animado criado!");
-
-          // PASSO 2: Adicionar o texto sobre o fundo
           const finalArgs = [
             "-y",
             "-i", tempVideoFile,
@@ -209,9 +214,6 @@ export async function generateVideoFromText(
             "-crf", "23",
             outputPath,
           ];
-
-          console.log("🔧 Adicionando texto ao vídeo...");
-          console.log("🔧 Comando:", "ffmpeg " + finalArgs.join(" "));
 
           const finalProcess = spawn("ffmpeg", finalArgs);
 
@@ -232,7 +234,6 @@ export async function generateVideoFromText(
           });
 
           finalProcess.on("close", (finalCode) => {
-            // Limpar arquivos temporários
             try {
               if (fs.existsSync(tempVideoFile)) {
                 fs.unlinkSync(tempVideoFile);
@@ -256,7 +257,6 @@ export async function generateVideoFromText(
           });
 
         } else {
-          // Limpar arquivo temporário
           try {
             if (fs.existsSync(tempTextFile)) {
               fs.unlinkSync(tempTextFile);
@@ -271,7 +271,6 @@ export async function generateVideoFromText(
       });
 
     } else {
-      // Sem animação - direto
       const bgHex = backgroundColor.replace('#', '');
       const args = [
         "-y",
@@ -285,8 +284,6 @@ export async function generateVideoFromText(
         "-crf", "23",
         outputPath,
       ];
-
-      console.log("🔧 Comando FFmpeg:", "ffmpeg " + args.join(" "));
 
       const ffmpeg = spawn("ffmpeg", args);
       let hasError = false;

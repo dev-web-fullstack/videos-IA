@@ -47,14 +47,13 @@ export default function BackgroundSelector({
 }: BackgroundSelectorProps) {
 
   const [isRandomizing, setIsRandomizing] = useState(false);
+  const isAnimationEnabled = animationType !== "none";
 
   const handleRandom = () => {
     setIsRandomizing(true);
 
-    // Gerar configuração aleatória
     const config = getRandomBackgroundConfig();
 
-    // Aplicar com animação
     onAnimationChange(config.type);
     onPositionChange(config.position);
     onColorChange(config.backgroundColor);
@@ -109,7 +108,7 @@ export default function BackgroundSelector({
         </div>
       </div>
 
-      {/* Cor de fundo (para sem animação ou como base) */}
+      {/* Cor de fundo */}
       <div className="space-y-2">
         <label className="block text-sm text-gray-300">
           Cor de fundo
@@ -136,7 +135,7 @@ export default function BackgroundSelector({
         </div>
       </div>
 
-      {/* Posição da animação */}
+      {/* Posição da animação - DESABILITADA se "Sem animação" */}
       <div className="space-y-2">
         <label className="block text-sm text-gray-300">
           Posição da animação
@@ -145,12 +144,15 @@ export default function BackgroundSelector({
           {positions.map((pos) => (
             <button
               key={pos.value}
-              onClick={() => onPositionChange(pos.value)}
+              onClick={() => isAnimationEnabled && onPositionChange(pos.value)}
+              disabled={!isAnimationEnabled}
               className={`
                 rounded-lg p-3 text-center transition-all duration-200
-                ${position === pos.value
-                  ? "bg-green-600 text-white border-2 border-green-400"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent"
+                ${!isAnimationEnabled
+                  ? "bg-gray-700 text-gray-500 cursor-not-allowed opacity-50"
+                  : position === pos.value
+                    ? "bg-green-600 text-white border-2 border-green-400"
+                    : "bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent"
                 }
               `}
             >
@@ -159,9 +161,14 @@ export default function BackgroundSelector({
             </button>
           ))}
         </div>
+        {!isAnimationEnabled && (
+          <p className="text-xs text-gray-500 text-center">
+            ⚠️ Selecione uma animação para configurar a posição
+          </p>
+        )}
       </div>
 
-      {/* Preview da posição com cor */}
+      {/* Preview da posição */}
       <div className="space-y-2">
         <label className="block text-sm text-gray-300">
           Prévia da posição
@@ -171,7 +178,7 @@ export default function BackgroundSelector({
           style={{ backgroundColor }}
         >
           <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-300">
-            {animationType !== "none" ? (
+            {isAnimationEnabled ? (
               <>
                 <span className="mr-1">{animations.find(a => a.value === animationType)?.icon}</span>
                 <span>{animations.find(a => a.value === animationType)?.label}</span>
@@ -180,27 +187,29 @@ export default function BackgroundSelector({
               "Fundo sólido"
             )}
           </div>
-          <div
-            className={`
-              absolute bg-white/20 border-2 border-white/50 transition-all duration-300
-              ${position === "full" ? "inset-0" : ""}
-              ${position === "top-half" ? "inset-x-0 top-0 h-1/2" : ""}
-              ${position === "center" ? "inset-x-0 top-1/4 h-1/2" : ""}
-              ${position === "bottom-half" ? "inset-x-0 bottom-0 h-1/2" : ""}
-            `}
-          >
-            <div className="absolute inset-0 flex items-center justify-center text-xs text-white font-semibold">
-              {position === "full" ? "Tela inteira" : ""}
-              {position === "top-half" ? "Topo" : ""}
-              {position === "center" ? "Centro" : ""}
-              {position === "bottom-half" ? "Base" : ""}
+          {isAnimationEnabled && (
+            <div
+              className={`
+                absolute bg-white/20 border-2 border-white/50 transition-all duration-300
+                ${position === "full" ? "inset-0" : ""}
+                ${position === "top-half" ? "inset-x-0 top-0 h-1/2" : ""}
+                ${position === "center" ? "inset-x-0 top-1/4 h-1/2" : ""}
+                ${position === "bottom-half" ? "inset-x-0 bottom-0 h-1/2" : ""}
+              `}
+            >
+              <div className="absolute inset-0 flex items-center justify-center text-xs text-white font-semibold">
+                {position === "full" ? "Tela inteira" : ""}
+                {position === "top-half" ? "Topo" : ""}
+                {position === "center" ? "Centro" : ""}
+                {position === "bottom-half" ? "Base" : ""}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
       {/* Informação sobre performance */}
-      {animationType !== "none" && (
+      {isAnimationEnabled && (
         <div className="rounded-lg bg-yellow-900/20 border border-yellow-700 p-3">
           <p className="text-xs text-yellow-300">
             ⚡ Animações podem aumentar o tempo de renderização.

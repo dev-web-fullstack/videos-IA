@@ -34,3 +34,24 @@ export function ensureTempFolder() {
 
   return dir;
 }
+
+// Função para limpar TODOS os vídeos da pasta
+export function clearAllVideos() {
+  const dir = path.join(process.cwd(), "public", "videos");
+  if (!fs.existsSync(dir)) return;
+
+  try {
+    const files = fs.readdirSync(dir);
+    let deletedCount = 0;
+    for (const file of files) {
+      const filePath = path.join(dir, file);
+      try {
+        fs.unlinkSync(filePath);
+        deletedCount++;
+      } catch (e) { }
+    }
+    if (deletedCount > 0) {
+      console.log(`🗑️ ${deletedCount} vídeos antigos removidos da pasta`);
+    }
+  } catch (e) { }
+}

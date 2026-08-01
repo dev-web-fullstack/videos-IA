@@ -6,6 +6,7 @@ import Select from "../ui/Select";
 import type {
   TextStyle,
   TextAlign,
+  TextVerticalPosition,
 } from "../../lib/textStyle";
 
 interface Props {
@@ -42,7 +43,7 @@ const alignOptions = [
   },
   {
     value: "center",
-    label: "Centralizado",
+    label: "Centro",
   },
   {
     value: "right",
@@ -51,6 +52,21 @@ const alignOptions = [
   {
     value: "justify",
     label: "Justificado",
+  },
+];
+
+const verticalPositionOptions = [
+  {
+    value: "top",
+    label: "⬆️ Cima",
+  },
+  {
+    value: "center",
+    label: "⏺️ Centro",
+  },
+  {
+    value: "bottom",
+    label: "⬇️ Baixo",
   },
 ];
 
@@ -118,7 +134,7 @@ export default function TextStyleEditor({
 
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-5">
 
             <div>
 
@@ -176,6 +192,10 @@ export default function TextStyleEditor({
 
             </div>
 
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
             <div>
 
               <label className="block text-sm text-gray-300 mb-2">
@@ -189,6 +209,25 @@ export default function TextStyleEditor({
                   update(
                     "align",
                     e.target.value as TextAlign
+                  )
+                }
+              />
+
+            </div>
+
+            <div>
+
+              <label className="block text-sm text-gray-300 mb-2">
+                Posição
+              </label>
+
+              <Select
+                options={verticalPositionOptions}
+                value={value.verticalPosition}
+                onChange={(e) =>
+                  update(
+                    "verticalPosition",
+                    e.target.value as TextVerticalPosition
                   )
                 }
               />

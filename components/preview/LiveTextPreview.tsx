@@ -35,7 +35,6 @@ export default function LiveTextPreview({
   const previewWidth = width * scale;
   const previewHeight = height * scale;
 
-  // Usar o mesmo layout do vídeo
   const layout = buildTextLayout({
     text,
     width,
@@ -45,7 +44,6 @@ export default function LiveTextPreview({
     align: style.align,
   });
 
-  // Calcular opacidade para o background
   const bgOpacity = style.backgroundOpacity / 100;
   const bgColor = style.backgroundColor;
 
@@ -59,7 +57,7 @@ export default function LiveTextPreview({
   const isJustified = style.align === "justify";
   const lines = layout.lines;
 
-  // Determinar textAlign
+  // Alinhamento horizontal
   let textAlign: "left" | "center" | "right" = "center";
   switch (style.align) {
     case "left":
@@ -77,14 +75,27 @@ export default function LiveTextPreview({
       break;
   }
 
-  // Gerar fundo animado para preview (simulação CSS)
+  // Posição vertical - NOVO
+  let verticalAlign: "flex-start" | "center" | "flex-end" = "center";
+  switch (style.verticalPosition) {
+    case "top":
+      verticalAlign = "flex-start";
+      break;
+    case "bottom":
+      verticalAlign = "flex-end";
+      break;
+    case "center":
+    default:
+      verticalAlign = "center";
+      break;
+  }
+
+  // Gerar fundo animado para preview
   const getBackgroundStyle = () => {
     if (backgroundAnimation === "none") {
       return backgroundColor;
     }
 
-    // Simulação simples para preview
-    // Em um cenário real, você usaria canvas para animações
     switch (backgroundAnimation) {
       case "gradient-wave":
         return `linear-gradient(45deg, ${backgroundColor}, #ff6b6b, #4ecdc4, ${backgroundColor})`;
@@ -101,7 +112,6 @@ export default function LiveTextPreview({
     }
   };
 
-  // Calcular posição da animação para preview
   const getAnimationPosition = () => {
     switch (backgroundPosition) {
       case "top-half":
@@ -133,7 +143,7 @@ export default function LiveTextPreview({
             backgroundColor: backgroundColor,
           }}
         >
-          {/* Fundo animado (preview) */}
+          {/* Fundo animado */}
           {backgroundAnimation !== "none" && (
             <div
               className="absolute"
@@ -149,10 +159,11 @@ export default function LiveTextPreview({
             />
           )}
 
-          {/* Área do texto */}
+          {/* Área do texto com posição vertical */}
           <div
-            className="absolute inset-0 flex items-center justify-center"
+            className="absolute inset-0 flex"
             style={{
+              alignItems: verticalAlign, // NOVO: controle vertical
               paddingLeft: style.marginX * scale,
               paddingRight: style.marginX * scale,
               paddingTop: style.marginY * scale,
@@ -212,7 +223,7 @@ export default function LiveTextPreview({
             </div>
           </div>
 
-          {/* Indicador de animação ativa */}
+          {/* Indicadores */}
           {backgroundAnimation !== "none" && (
             <div className="absolute top-2 right-2 bg-black/60 rounded-full px-2 py-0.5 text-[8px] text-white/70 border border-white/20">
               🎨 {backgroundAnimation}
@@ -225,6 +236,7 @@ export default function LiveTextPreview({
         {width} × {height} | {lines.length} linhas
         {backgroundAnimation !== "none" && ` | 🎨 ${backgroundAnimation}`}
         {style.align === "justify" && " | 📐 Justificado"}
+        {style.verticalPosition !== "center" && ` | 📍 ${style.verticalPosition === "top" ? "⬆️ Cima" : "⬇️ Baixo"}`}
       </div>
     </section>
   );

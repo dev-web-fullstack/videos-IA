@@ -4,6 +4,11 @@ export type TextAlign =
   | "right"
   | "justify";
 
+export type TextVerticalPosition =
+  | "top"
+  | "center"
+  | "bottom";
+
 export interface TextStyle {
 
   //-----------------------
@@ -61,6 +66,8 @@ export interface TextStyle {
   lineSpacing: number;
 
   align: TextAlign;
+
+  verticalPosition: TextVerticalPosition; // NOVO
 
 }
 
@@ -160,6 +167,8 @@ export function createDefaultTextStyle({
     ),
 
     align: "center",
+
+    verticalPosition: "center", // NOVO
 
   };
 
