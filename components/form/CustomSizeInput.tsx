@@ -1,3 +1,4 @@
+// components/form/CustomSizeInput.tsx
 import Input from "../../components/ui/Input";
 import VideoPreview from "./VideoPreview";
 
@@ -23,15 +24,15 @@ export default function CustomSizeInput({
 
       <div className="grid lg:grid-cols-2 gap-8 items-start">
 
-        {/* Campos */}
         <div className="space-y-5">
 
           <div className="space-y-2">
-            <label className="text-sm text-gray-300">
+            <label htmlFor="custom-width" className="text-sm text-gray-300">
               Largura (px)
             </label>
-
             <Input
+              id="custom-width"
+              name="customWidth"
               type="number"
               min={320}
               max={7680}
@@ -44,11 +45,12 @@ export default function CustomSizeInput({
           </div>
 
           <div className="space-y-2">
-            <label className="text-sm text-gray-300">
+            <label htmlFor="custom-height" className="text-sm text-gray-300">
               Altura (px)
             </label>
-
             <Input
+              id="custom-height"
+              name="customHeight"
               type="number"
               min={320}
               max={7680}
@@ -70,14 +72,8 @@ export default function CustomSizeInput({
 
         </div>
 
-        {/* Prévia */}
         <div className="space-y-4">
-
-          <VideoPreview
-            width={width}
-            height={height}
-          />
-
+          <VideoPreview width={width} height={height} />
           <div className="text-center text-sm text-gray-400">
             Resolução atual:
             <span className="font-semibold text-white">
@@ -85,7 +81,6 @@ export default function CustomSizeInput({
               {width} × {height}
             </span>
           </div>
-
         </div>
 
       </div>

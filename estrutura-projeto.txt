@@ -1,11 +1,14 @@
 ========================================
-📁 ESTRUTURA DO PROJETO NEXT.JS
-📅 31/07/2026, 20:55:06
+📁 ESTRUTURA COMPLETA DO PROJETO
+📅 01/08/2026, 15:48:16
 ========================================
 
-├── 📄 estrutura-projeto.txt (1.6KB)
-├── 📄 estrutura.txt (0.1KB)
-├── 📜 generate-structure.js (8.1KB)
+├── 📁 temp/ (vazia)
+├── 📁 tmp/ (vazia)
+├── 🔒 .gitignore (0.5KB)
+├── 📄 eslint.config.mjs (0.5KB)
+├── 📄 estrutura-projeto.txt (3.1KB)
+├── 📜 generate-structure.js (12.2KB)
 ├── 📘 next.config.ts (0.1KB)
 ├── 📦 package.json (0.7KB)
 ├── 📄 postcss.config.mjs (0.1KB)
@@ -16,25 +19,39 @@
 📊 RESUMO DO PROJETO
 ========================================
 
-📁 Total de arquivos: 8
+📁 Total de arquivos: 53
+📁 Total de pastas: 2413
 
 📊 Por extensão:
+   🎨 .css: 1 arquivos
+   🖼️ .ico: 1 arquivos
    📜 .js: 1 arquivos
    📋 .json: 2 arquivos
    📝 .md: 1 arquivos
-   📄 .mjs: 1 arquivos
-   📘 .ts: 1 arquivos
-   📄 .txt: 2 arquivos
+   📄 .mjs: 2 arquivos
+   🖼️ .svg: 5 arquivos
+   📘 .ts: 11 arquivos
+   ⚛️ .tsx: 23 arquivos
+   🔤 .ttf: 4 arquivos
+   📄 .txt: 1 arquivos
+   📄 sem_extensao: 1 arquivos
 
 📁 Pastas principais:
-   ✅ app/ (2 itens)
-   ✅ components/ (0 itens)
-   ✅ lib/ (6 itens)
-   ✅ public/ (0 itens)
+   ✅ app/
+   ✅ components/
+   ✅ lib/
+   ✅ public/
    ❌ styles/ (não encontrado)
    ❌ utils/ (não encontrado)
    ❌ hooks/ (não encontrado)
    ❌ types/ (não encontrado)
+   ✅ temp/ (vazia)
+   ✅ tmp/ (vazia)
+
+📁 Pastas vazias (criadas automaticamente):
+   ✅ public/videos/ (vazia)
+   ✅ temp/ (vazia)
+   ✅ tmp/ (vazia)
 
 ========================================
 🎯 ARQUIVOS IMPORTANTES
@@ -42,15 +59,42 @@
 
 ✅ package.json (0.7KB)
 ✅ tsconfig.json (0.7KB)
-❌ next.config.js (não encontrado)
 ✅ next.config.ts (0.1KB)
-❌ tailwind.config.js (não encontrado)
-❌ postcss.config.js (não encontrado)
 ✅ app/page.tsx (12.3KB)
 ✅ app/layout.tsx (0.7KB)
 ✅ app/globals.css (0.5KB)
-✅ components/form/TextStyleEditor.tsx (8.6KB)
+✅ app/api/generate-video/route.ts (2.7KB)
+✅ app/api/download-video/route.ts (3.0KB)
+✅ app/api/delete-video/route.ts (2.1KB)
 ✅ components/form/BackgroundSelector.tsx (8.3KB)
+✅ components/form/CustomSizeInput.tsx (2.4KB)
+✅ components/form/DurationInput.tsx (0.8KB)
+✅ components/form/GenerateButton.tsx (0.7KB)
+✅ components/form/ScriptInput.tsx (0.6KB)
+✅ components/form/TextStyleEditor.tsx (8.6KB)
+✅ components/form/VideoFormatSelect.tsx (3.8KB)
+✅ components/form/VideoPreview.tsx (1.3KB)
+✅ components/form/VideoSizeSelector.tsx (1.0KB)
+✅ components/preview/AspectRatioPreview.tsx (1.2KB)
+✅ components/preview/FormatPreview.tsx (1.4KB)
+✅ components/preview/LiveTextPreview.tsx (7.5KB)
+✅ components/preview/ProgressBar.tsx (4.0KB)
+✅ components/preview/ResultCard.tsx (4.3KB)
+✅ components/preview/VideoPlayer.tsx (0.8KB)
+✅ components/ui/Button.tsx (0.6KB)
+✅ components/ui/Card.tsx (0.2KB)
+✅ components/ui/Input.tsx (0.5KB)
+✅ components/ui/Select.tsx (0.8KB)
+✅ components/ui/Textarea.tsx (0.5KB)
+✅ components/layout/Header.tsx (0.1KB)
 ✅ lib/ffmpeg.ts (10.3KB)
 ✅ lib/textStyle.ts (2.5KB)
 ✅ lib/backgroundAnimations.ts (3.4KB)
+✅ lib/utils.ts (1.5KB)
+✅ lib/videoConfig.ts (1.3KB)
+✅ lib/textLayout.ts (5.2KB)
+✅ lib/textFormatter.ts (1.0KB)
+✅ public/fonts/Arial.ttf (1012.3KB)
+✅ public/fonts/Roboto-Regular.ttf (155.4KB)
+✅ public/fonts/Tahoma.ttf (917.3KB)
+✅ public/fonts/Verdana.ttf (237.6KB)

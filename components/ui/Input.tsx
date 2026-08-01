@@ -1,13 +1,25 @@
-import { InputHTMLAttributes } from "react";
+// components/ui/Input.tsx
+import { InputHTMLAttributes, forwardRef } from "react";
 
-type InputProps = InputHTMLAttributes<HTMLInputElement>;
+interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+  id?: string;
+  name?: string;
+}
 
-export default function Input({
+const Input = forwardRef<HTMLInputElement, InputProps>(({
   className,
+  id,
+  name,
   ...props
-}: InputProps) {
+}, ref) => {
+  // Gerar um id único se não for fornecido
+  const inputId = id || name || `input-${Math.random().toString(36).substring(7)}`;
+
   return (
     <input
+      ref={ref}
+      id={inputId}
+      name={name || inputId}
       {...props}
       className={`
         w-full
@@ -23,4 +35,8 @@ export default function Input({
       `}
     />
   );
-}
+});
+
+Input.displayName = 'Input';
+
+export default Input;

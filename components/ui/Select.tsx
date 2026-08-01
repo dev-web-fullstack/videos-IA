@@ -1,22 +1,31 @@
-import { SelectHTMLAttributes } from "react";
+// components/ui/Select.tsx
+import { SelectHTMLAttributes, forwardRef } from "react";
 
 interface Option {
   value: string;
   label: string;
 }
 
-interface SelectProps
-  extends SelectHTMLAttributes<HTMLSelectElement> {
+interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   options: Option[];
+  id?: string;
+  name?: string;
 }
 
-export default function Select({
+const Select = forwardRef<HTMLSelectElement, SelectProps>(({
   options,
   className,
+  id,
+  name,
   ...props
-}: SelectProps) {
+}, ref) => {
+  const selectId = id || name || `select-${Math.random().toString(36).substring(7)}`;
+
   return (
     <select
+      ref={ref}
+      id={selectId}
+      name={name || selectId}
       {...props}
       className={`
         w-full
@@ -41,4 +50,8 @@ export default function Select({
       ))}
     </select>
   );
-}
+});
+
+Select.displayName = 'Select';
+
+export default Select;

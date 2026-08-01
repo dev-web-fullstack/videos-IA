@@ -1,14 +1,24 @@
-import { TextareaHTMLAttributes } from "react";
+// components/ui/Textarea.tsx
+import { TextareaHTMLAttributes, forwardRef } from "react";
 
-type TextareaProps =
-  TextareaHTMLAttributes<HTMLTextAreaElement>;
+interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+  id?: string;
+  name?: string;
+}
 
-export default function Textarea({
+const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(({
   className,
+  id,
+  name,
   ...props
-}: TextareaProps) {
+}, ref) => {
+  const textareaId = id || name || `textarea-${Math.random().toString(36).substring(7)}`;
+
   return (
     <textarea
+      ref={ref}
+      id={textareaId}
+      name={name || textareaId}
       {...props}
       className={`
         w-full
@@ -26,4 +36,8 @@ export default function Textarea({
       `}
     />
   );
-}
+});
+
+Textarea.displayName = 'Textarea';
+
+export default Textarea;

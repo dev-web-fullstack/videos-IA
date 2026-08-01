@@ -5,7 +5,7 @@ const path = require('path');
 const projectRoot = __dirname;
 const outputFile = path.join(projectRoot, 'estrutura-projeto.txt');
 
-// Pastas para ignorar
+// Pastas para ignorar (APENAS as essenciais)
 const ignoreFolders = [
   'node_modules',
   '.next',
@@ -13,15 +13,13 @@ const ignoreFolders = [
   'build',
   'out',
   '.git',
-  'tmp',
-  'public/videos',
   'coverage',
   '.vscode',
   '.vercel',
   '.turbo',
   '__pycache__',
   '.cache',
-  'public/fonts/.DS_Store'
+  '.DS_Store'
 ];
 
 // Extensões para incluir
@@ -30,10 +28,15 @@ const includeExtensions = [
   '.css', '.scss', '.module.css',
   '.json', '.md', '.yml', '.yaml',
   '.html', '.htm', '.txt', '.env',
-  '.gitignore', '.eslintrc', '.prettierrc'
+  '.gitignore', '.eslintrc', '.prettierrc',
+  '.mjs', '.cjs', '.ttf', '.woff', '.woff2', '.otf',
+  '.mp4', '.webm', '.avi', '.mov',
+  '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+  '.zip', '.rar', '.7z'
 ];
 
-// Arquivos específicos para incluir (mesmo sem extensão)
+// Arquivos específicos para incluir
 const includeFiles = [
   'next.config.js',
   'next.config.ts',
@@ -45,28 +48,19 @@ const includeFiles = [
   'tsconfig.json',
   'package.json',
   'package-lock.json',
-  'yarn.lock',
-  'pnpm-lock.yaml',
-  'bun.lockb',
   '.env.example',
   '.env.local',
-  '.env.development',
-  '.env.production',
   'README.md',
   'LICENSE',
-  'CHANGELOG.md',
-  'CONTRIBUTING.md',
   '.gitignore',
   '.eslintrc.json',
-  '.eslintrc.js',
   '.prettierrc',
-  '.prettierrc.json',
-  '.prettierrc.js',
   'components.json',
-  'next-env.d.ts'
+  'generate-structure.js',
+  'eslint.config.mjs'
 ];
 
-// Arquivos para SEMPRE ignorar (mesmo se estiverem na lista de include)
+// Arquivos para SEMPRE ignorar
 const alwaysIgnore = [
   'package-lock.json',
   'yarn.lock',
@@ -75,6 +69,14 @@ const alwaysIgnore = [
   'next-env.d.ts',
   '.DS_Store',
   'thumbs.db'
+];
+
+// Pastas que DEVEM ser mostradas mesmo se vazias
+const keepEmptyFolders = [
+  'public/videos',
+  'temp',
+  'tmp',
+  'public'
 ];
 
 function shouldInclude(filePath) {
@@ -88,8 +90,10 @@ function shouldInclude(filePath) {
 
   // Verificar se está em pasta ignorada
   const normalizedPath = relativePath.replace(/\\/g, '/');
-  for (const folder of ignoreFolders) {
-    if (normalizedPath.includes(folder)) {
+  const pathParts = normalizedPath.split('/');
+
+  for (const part of pathParts) {
+    if (ignoreFolders.includes(part)) {
       return false;
     }
   }
@@ -105,10 +109,22 @@ function shouldInclude(filePath) {
   return includeExtensions.includes(ext);
 }
 
-function generateStructure(dir, prefix = '', isLast = true) {
+function shouldKeepFolder(folderPath) {
+  const relativePath = path.relative(projectRoot, folderPath);
+  const normalizedPath = relativePath.replace(/\\/g, '/');
+
+  // Verificar se a pasta está na lista de pastas a manter
+  for (const keepFolder of keepEmptyFolders) {
+    if (normalizedPath === keepFolder || normalizedPath.startsWith(keepFolder + '/')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function generateStructure(dir, prefix = '') {
   let output = '';
 
-  // Ler todos os itens do diretório
   let items = [];
   try {
     items = fs.readdirSync(dir);
@@ -120,15 +136,36 @@ function generateStructure(dir, prefix = '', isLast = true) {
   const filteredItems = [];
   for (const item of items) {
     const itemPath = path.join(dir, item);
-    // Pular se não deve ser incluído
+    const stats = fs.statSync(itemPath);
+    const isDirectory = stats.isDirectory();
+
+    // Se for diretório e estiver vazio, verificar se deve manter
+    if (isDirectory) {
+      const subItems = fs.readdirSync(itemPath);
+      if (subItems.length === 0) {
+        // Pasta vazia - manter apenas se estiver na lista
+        if (shouldKeepFolder(itemPath)) {
+          filteredItems.push({
+            name: item,
+            path: itemPath,
+            isDirectory: true,
+            size: 0,
+            isEmpty: true
+          });
+        }
+        continue;
+      }
+    }
+
+    // Verificar se deve incluir
     if (!shouldInclude(itemPath)) continue;
 
-    const stats = fs.statSync(itemPath);
     filteredItems.push({
       name: item,
       path: itemPath,
-      isDirectory: stats.isDirectory(),
-      size: stats.size
+      isDirectory: isDirectory,
+      size: stats.size,
+      isEmpty: false
     });
   }
 
@@ -146,13 +183,18 @@ function generateStructure(dir, prefix = '', isLast = true) {
     const nextPrefix = prefix + (isLastItem ? '    ' : '│   ');
 
     if (item.isDirectory) {
-      // Mostrar pasta
-      output += `${prefix}${connector}📁 ${item.name}/\n`;
-      // Recursivamente gerar conteúdo da pasta
-      const subContent = generateStructure(item.path, nextPrefix, isLastItem);
-      output += subContent;
+      if (item.isEmpty) {
+        // Pasta vazia
+        output += `${prefix}${connector}📁 ${item.name}/ (vazia)\n`;
+      } else {
+        // Pasta com conteúdo
+        output += `${prefix}${connector}📁 ${item.name}/\n`;
+        const subContent = generateStructure(item.path, nextPrefix);
+        if (subContent) {
+          output += subContent;
+        }
+      }
     } else {
-      // Mostrar arquivo com tamanho
       const sizeKB = (item.size / 1024).toFixed(1);
       const sizeStr = sizeKB > 0 ? ` (${sizeKB}KB)` : ' (0.1KB)';
       const icon = getFileIcon(item.name);
@@ -184,6 +226,22 @@ function getFileIcon(fileName) {
     '.gitignore': '🔒',
     '.eslintrc': '🔧',
     '.prettierrc': '💅',
+    '.mjs': '📄',
+    '.cjs': '📄',
+    '.ttf': '🔤',
+    '.woff': '🔤',
+    '.woff2': '🔤',
+    '.otf': '🔤',
+    '.mp4': '🎬',
+    '.webm': '🎬',
+    '.png': '🖼️',
+    '.jpg': '🖼️',
+    '.jpeg': '🖼️',
+    '.gif': '🖼️',
+    '.svg': '🖼️',
+    '.ico': '🖼️',
+    '.pdf': '📄',
+    '.zip': '📦',
     'next.config': '⚙️',
     'tailwind.config': '🎨',
     'postcss.config': '⚙️',
@@ -192,49 +250,55 @@ function getFileIcon(fileName) {
     'LICENSE': '📜',
   };
 
-  // Verificar por nome exato
   if (icons[fileName]) return icons[fileName];
-
-  // Verificar por extensão
   if (icons[ext]) return icons[ext];
-
   return '📄';
 }
 
-// Gerar estrutura
+// ============================================
+// GERAR ESTRUTURA
+// ============================================
+
 let fullOutput = '========================================\n';
-fullOutput += '📁 ESTRUTURA DO PROJETO NEXT.JS\n';
+fullOutput += '📁 ESTRUTURA COMPLETA DO PROJETO\n';
 fullOutput += `📅 ${new Date().toLocaleString()}\n`;
 fullOutput += '========================================\n\n';
 
 const structure = generateStructure(projectRoot);
 fullOutput += structure || 'Nenhum arquivo encontrado.\n';
 
-// Adicionar resumo
+// ============================================
+// RESUMO
+// ============================================
+
 fullOutput += '\n========================================\n';
 fullOutput += '📊 RESUMO DO PROJETO\n';
 fullOutput += '========================================\n\n';
 
-// Contar arquivos por extensão
+// Contar arquivos
 const allFiles = [];
+const allFolders = [];
+
 function collectFiles(dir) {
   const items = fs.readdirSync(dir);
   for (const item of items) {
     const itemPath = path.join(dir, item);
-    if (!shouldInclude(itemPath)) continue;
     try {
       const stats = fs.statSync(itemPath);
       if (stats.isDirectory()) {
+        allFolders.push(itemPath);
         collectFiles(itemPath);
       } else {
-        allFiles.push(itemPath);
+        if (shouldInclude(itemPath)) {
+          allFiles.push(itemPath);
+        }
       }
     } catch (e) { }
   }
 }
 collectFiles(projectRoot);
 
-// Filtrar lock files do resumo
+// Filtrar arquivos
 const filteredFiles = allFiles.filter(f => {
   const name = path.basename(f);
   return !alwaysIgnore.includes(name);
@@ -246,63 +310,144 @@ for (const file of filteredFiles) {
   extensions[ext] = (extensions[ext] || 0) + 1;
 }
 
-fullOutput += `📁 Total de arquivos: ${filteredFiles.length}\n\n`;
+fullOutput += `📁 Total de arquivos: ${filteredFiles.length}\n`;
+fullOutput += `📁 Total de pastas: ${allFolders.length}\n\n`;
 fullOutput += '📊 Por extensão:\n';
 for (const [ext, count] of Object.entries(extensions).sort()) {
   const emoji = getFileIcon('example' + ext);
   fullOutput += `   ${emoji} ${ext}: ${count} arquivos\n`;
 }
 
-// Listar pastas principais
+// Pastas principais
 fullOutput += '\n📁 Pastas principais:\n';
-const mainFolders = ['app', 'components', 'lib', 'public', 'styles', 'utils', 'hooks', 'types'];
+const mainFolders = ['app', 'components', 'lib', 'public', 'styles', 'utils', 'hooks', 'types', 'temp', 'tmp'];
 for (const folder of mainFolders) {
   const folderPath = path.join(projectRoot, folder);
   if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
-    const count = fs.readdirSync(folderPath).filter(f => {
-      const fPath = path.join(folderPath, f);
-      return shouldInclude(fPath);
-    }).length;
-    fullOutput += `   ✅ ${folder}/ (${count} itens)\n`;
+    const count = countFilesInFolder(folderPath);
+    const empty = count === 0 ? ' (vazia)' : '';
+    fullOutput += `   ✅ ${folder}/${empty}\n`;
   } else {
     fullOutput += `   ❌ ${folder}/ (não encontrado)\n`;
   }
 }
 
+function countFilesInFolder(dir) {
+  let count = 0;
+  try {
+    const items = fs.readdirSync(dir);
+    for (const item of items) {
+      const itemPath = path.join(dir, item);
+      try {
+        const stats = fs.statSync(itemPath);
+        if (stats.isDirectory()) {
+          count += countFilesInFolder(itemPath);
+        } else {
+          if (shouldInclude(itemPath)) {
+            count++;
+          }
+        }
+      } catch (e) { }
+    }
+  } catch (e) { }
+  return count;
+}
+
+// Pastas vazias importantes
+fullOutput += '\n📁 Pastas vazias (criadas automaticamente):\n';
+const emptyFolders = ['public/videos', 'temp', 'tmp'];
+for (const folder of emptyFolders) {
+  const folderPath = path.join(projectRoot, folder);
+  if (fs.existsSync(folderPath) && fs.statSync(folderPath).isDirectory()) {
+    const items = fs.readdirSync(folderPath);
+    if (items.length === 0) {
+      fullOutput += `   ✅ ${folder}/ (vazia)\n`;
+    } else {
+      fullOutput += `   ✅ ${folder}/ (${items.length} itens)\n`;
+    }
+  } else {
+    fullOutput += `   ❌ ${folder}/ (não encontrado)\n`;
+  }
+}
+
+// Arquivos importantes
 fullOutput += '\n========================================\n';
 fullOutput += '🎯 ARQUIVOS IMPORTANTES\n';
 fullOutput += '========================================\n\n';
 
 const importantFiles = [
+  // Root
   'package.json',
   'tsconfig.json',
-  'next.config.js',
   'next.config.ts',
-  'tailwind.config.js',
-  'postcss.config.js',
+  // App
   'app/page.tsx',
   'app/layout.tsx',
   'app/globals.css',
-  'components/form/TextStyleEditor.tsx',
+  // API
+  'app/api/generate-video/route.ts',
+  'app/api/download-video/route.ts',
+  'app/api/delete-video/route.ts',
+  // Form
   'components/form/BackgroundSelector.tsx',
+  'components/form/CustomSizeInput.tsx',
+  'components/form/DurationInput.tsx',
+  'components/form/GenerateButton.tsx',
+  'components/form/ScriptInput.tsx',
+  'components/form/TextStyleEditor.tsx',
+  'components/form/VideoFormatSelect.tsx',
+  'components/form/VideoPreview.tsx',
+  'components/form/VideoSizeSelector.tsx',
+  // Preview
+  'components/preview/AspectRatioPreview.tsx',
+  'components/preview/FormatPreview.tsx',
+  'components/preview/LiveTextPreview.tsx',
+  'components/preview/ProgressBar.tsx',
+  'components/preview/ResultCard.tsx',
+  'components/preview/VideoPlayer.tsx',
+  // UI
+  'components/ui/Button.tsx',
+  'components/ui/Card.tsx',
+  'components/ui/Input.tsx',
+  'components/ui/Select.tsx',
+  'components/ui/Textarea.tsx',
+  // Layout
+  'components/layout/Header.tsx',
+  // Lib
   'lib/ffmpeg.ts',
   'lib/textStyle.ts',
   'lib/backgroundAnimations.ts',
+  'lib/utils.ts',
+  'lib/videoConfig.ts',
+  'lib/textLayout.ts',
+  'lib/textFormatter.ts',
+  // Public - Fontes
+  'public/fonts/Arial.ttf',
+  'public/fonts/Roboto-Regular.ttf',
+  'public/fonts/Tahoma.ttf',
+  'public/fonts/Verdana.ttf',
 ];
 
 for (const file of importantFiles) {
   const filePath = path.join(projectRoot, file);
   if (fs.existsSync(filePath)) {
-    const size = (fs.statSync(filePath).size / 1024).toFixed(1);
-    fullOutput += `✅ ${file} (${size}KB)\n`;
+    try {
+      const stats = fs.statSync(filePath);
+      if (stats.isDirectory()) {
+        fullOutput += `✅ ${file}/ (pasta)\n`;
+      } else {
+        const size = (stats.size / 1024).toFixed(1);
+        fullOutput += `✅ ${file} (${size}KB)\n`;
+      }
+    } catch (e) {
+      fullOutput += `✅ ${file}\n`;
+    }
   } else {
     fullOutput += `❌ ${file} (não encontrado)\n`;
   }
 }
 
-// Salvar arquivo
+// Salvar
 fs.writeFileSync(outputFile, fullOutput, 'utf-8');
 console.log(`✅ Estrutura salva em: ${outputFile}`);
-
-// Mostrar no console também
 console.log('\n' + fullOutput);

@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+// IMPORTANTE: Importar as fontes CSS
+import "../public/fonts/fonts.css";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -13,8 +16,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Video Generate",
-  description: "Gerador de vídeos",
+  title: "Videos IA - Gerador de Vídeos",
+  description: "Crie vídeos personalizados com texto e animações",
 };
 
 export default function RootLayout({

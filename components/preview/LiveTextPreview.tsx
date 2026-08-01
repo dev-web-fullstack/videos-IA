@@ -57,7 +57,6 @@ export default function LiveTextPreview({
   const isJustified = style.align === "justify";
   const lines = layout.lines;
 
-  // Alinhamento horizontal
   let textAlign: "left" | "center" | "right" = "center";
   switch (style.align) {
     case "left":
@@ -75,7 +74,6 @@ export default function LiveTextPreview({
       break;
   }
 
-  // Posição vertical - NOVO
   let verticalAlign: "flex-start" | "center" | "flex-end" = "center";
   switch (style.verticalPosition) {
     case "top":
@@ -90,7 +88,6 @@ export default function LiveTextPreview({
       break;
   }
 
-  // Gerar fundo animado para preview
   const getBackgroundStyle = () => {
     if (backgroundAnimation === "none") {
       return backgroundColor;
@@ -128,6 +125,9 @@ export default function LiveTextPreview({
 
   const animPosition = getAnimationPosition();
 
+  // USAR DIRETAMENTE O NOME DA FONTE SEM MAPEAMENTO
+  const fontFamily = style.fontFamily;
+
   return (
     <section className="space-y-4">
       <h2 className="text-lg font-semibold text-white">
@@ -143,7 +143,6 @@ export default function LiveTextPreview({
             backgroundColor: backgroundColor,
           }}
         >
-          {/* Fundo animado */}
           {backgroundAnimation !== "none" && (
             <div
               className="absolute"
@@ -159,11 +158,10 @@ export default function LiveTextPreview({
             />
           )}
 
-          {/* Área do texto com posição vertical */}
           <div
             className="absolute inset-0 flex"
             style={{
-              alignItems: verticalAlign, // NOVO: controle vertical
+              alignItems: verticalAlign,
               paddingLeft: style.marginX * scale,
               paddingRight: style.marginX * scale,
               paddingTop: style.marginY * scale,
@@ -175,7 +173,7 @@ export default function LiveTextPreview({
                 width: "100%",
                 textAlign: textAlign,
                 color: style.color,
-                fontFamily: style.fontFamily,
+                fontFamily: fontFamily,
                 fontSize: style.fontSize * scale,
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",
@@ -223,7 +221,6 @@ export default function LiveTextPreview({
             </div>
           </div>
 
-          {/* Indicadores */}
           {backgroundAnimation !== "none" && (
             <div className="absolute top-2 right-2 bg-black/60 rounded-full px-2 py-0.5 text-[8px] text-white/70 border border-white/20">
               🎨 {backgroundAnimation}
@@ -237,6 +234,8 @@ export default function LiveTextPreview({
         {backgroundAnimation !== "none" && ` | 🎨 ${backgroundAnimation}`}
         {style.align === "justify" && " | 📐 Justificado"}
         {style.verticalPosition !== "center" && ` | 📍 ${style.verticalPosition === "top" ? "⬆️ Cima" : "⬇️ Baixo"}`}
+        <br />
+        <span className="text-gray-500">Fonte: {style.fontFamily}</span>
       </div>
     </section>
   );
