@@ -6,6 +6,7 @@ interface DurationInputProps {
   onChange: (value: number) => void;
   id?: string;
   name?: string;
+  disabled?: boolean;
 }
 
 export default function DurationInput({
@@ -13,6 +14,7 @@ export default function DurationInput({
   onChange,
   id = "duration-input",
   name = "videoDuration",
+  disabled = false,
 }: DurationInputProps) {
   return (
     <section className="space-y-2">
@@ -30,6 +32,7 @@ export default function DurationInput({
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         placeholder="Ex.: 10"
+        disabled={disabled}
       />
 
       <p className="text-xs text-gray-400">

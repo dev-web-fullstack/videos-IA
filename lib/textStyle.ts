@@ -69,8 +69,11 @@ export function createDefaultTextStyle({
 
     padding: Math.round(fontSize * 0.35),
     borderRadius: Math.round(fontSize * 0.30),
-    marginX: Math.round(width * 0.08),
-    marginY: Math.round(height * 0.08),
+
+    // MARGENS REDUZIDAS - 2% para texto ficar mais perto das bordas
+    marginX: Math.round(width * 0.01),
+    marginY: Math.round(height * 0.01),
+
     lineSpacing: Math.round(fontSize * 0.35),
     align: "center",
     verticalPosition: "center",

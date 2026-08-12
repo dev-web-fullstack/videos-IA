@@ -6,6 +6,7 @@ interface ScriptInputProps {
   onChange: (value: string) => void;
   id?: string;
   name?: string;
+  disabled?: boolean;
 }
 
 export default function ScriptInput({
@@ -13,6 +14,7 @@ export default function ScriptInput({
   onChange,
   id = "script-input",
   name = "script",
+  disabled = false,
 }: ScriptInputProps) {
   return (
     <section className="space-y-2">
@@ -26,6 +28,7 @@ export default function ScriptInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Digite ou cole aqui o roteiro do vídeo..."
+        disabled={disabled}
       />
     </section>
   );

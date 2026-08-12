@@ -1,223 +1,297 @@
 // components/form/BackgroundSelector.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
-  BackgroundAnimationType,
-  BackgroundPosition,
+  Sparkles,
+  Palette,
+  Check,
+  Loader2,
+  AlertCircle,
+  Wand2,
+} from "lucide-react";
+import {
+  BackgroundType,
   backgroundColors,
-  getRandomBackgroundConfig,
-  getRandomAnimation,
-  getRandomPosition,
-  getRandomColor
+  getRandomColor,
+  generatePollinationsUrlFromText,
 } from "../../lib/backgroundAnimations";
 
 interface BackgroundSelectorProps {
-  animationType: BackgroundAnimationType;
-  position: BackgroundPosition;
+  backgroundType: BackgroundType;
   backgroundColor: string;
-  onAnimationChange: (type: BackgroundAnimationType) => void;
-  onPositionChange: (position: BackgroundPosition) => void;
+  imageUrl?: string;
+  width: number;
+  height: number;
+  scriptText: string;
+  onTypeChange: (type: BackgroundType) => void;
   onColorChange: (color: string) => void;
+  onImageChange: (url: string, prompt: string) => void;
+  onLoadingChange?: (loading: boolean) => void;
+  isGeneratingImage?: boolean;
 }
 
-const animations: { value: BackgroundAnimationType; label: string; icon: string; description: string }[] = [
-  { value: "none", label: "Sem animação", icon: "⬛", description: "Fundo sólido" },
-  { value: "gradient-wave", label: "Gradiente", icon: "🌈", description: "Cores mudando" },
-  { value: "particles", label: "Partículas", icon: "✨", description: "Círculos se movendo" },
-  { value: "waves", label: "Ondas", icon: "🌊", description: "Padrão ondulado" },
-  { value: "geometric-rotate", label: "Geometria", icon: "🔷", description: "Formas girando" },
-  { value: "light-pulse", label: "Pulso de Luz", icon: "💡", description: "Efeito respiração" },
-];
-
-const positions: { value: BackgroundPosition; label: string; icon: string }[] = [
-  { value: "full", label: "Tela inteira", icon: "▣" },
-  { value: "top-half", label: "Topo", icon: "▤" },
-  { value: "center", label: "Centro", icon: "◈" },
-  { value: "bottom-half", label: "Base", icon: "▥" },
-];
-
 export default function BackgroundSelector({
-  animationType,
-  position,
+  backgroundType,
   backgroundColor,
-  onAnimationChange,
-  onPositionChange,
+  imageUrl,
+  width,
+  height,
+  scriptText,
+  onTypeChange,
   onColorChange,
+  onImageChange,
+  onLoadingChange,
+  isGeneratingImage = false,
 }: BackgroundSelectorProps) {
 
-  const [isRandomizing, setIsRandomizing] = useState(false);
-  const isAnimationEnabled = animationType !== "none";
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const isMounted = useRef(true);
 
-  const handleRandom = () => {
-    setIsRandomizing(true);
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
-    const config = getRandomBackgroundConfig();
+  // Simular progresso enquanto gera - CORRIGIDO
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
 
-    onAnimationChange(config.type);
-    onPositionChange(config.position);
-    onColorChange(config.backgroundColor);
+    if (isGeneratingImage) {
+      setProgress(0);
+      setError(null);
+      interval = setInterval(() => {
+        setProgress(prev => {
+          if (prev >= 95) return prev;
+          return prev + Math.random() * 8;
+        });
+      }, 200);
+    } else {
+      // Quando para de gerar, definir progresso como 100 apenas se for > 0
+      // e se o componente ainda estiver montado
+      if (isMounted.current) {
+        setProgress(100);
+      }
+    }
 
-    setTimeout(() => setIsRandomizing(false), 300);
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isGeneratingImage]);
+
+  const handleGenerateAI = async () => {
+    if (!scriptText || scriptText.trim().length === 0) {
+      setError("❌ Digite um texto no vídeo primeiro!");
+      return;
+    }
+
+    if (onLoadingChange) onLoadingChange(true);
+    setError(null);
+    setProgress(0);
+
+    try {
+      const url = generatePollinationsUrlFromText(scriptText, width, height);
+      const promptMatch = url.match(/\/prompt\/([^?]+)/);
+      const prompt = promptMatch ? decodeURIComponent(promptMatch[1]) : "Prompt gerado";
+      onTypeChange("ai-generated");
+      onImageChange(url, prompt);
+
+      console.log("🎨 Prompt:", prompt);
+      console.log("🖼️ URL:", url);
+      console.log(`📐 Resolução: ${width}x${height}`);
+
+    } catch (error) {
+      console.error("❌ Erro:", error);
+      setError("Erro ao gerar imagem. Tente novamente.");
+      onImageChange("", "");
+      if (onLoadingChange) onLoadingChange(false);
+    }
+  };
+
+  const getStatusMessage = () => {
+    if (isGeneratingImage) {
+      if (progress < 30) return "🔄 Inicializando...";
+      if (progress < 60) return "🎨 Criando sua imagem...";
+      if (progress < 90) return "✨ Finalizando detalhes...";
+      return "📦 Quase pronto...";
+    }
+    return null;
   };
 
   return (
-    <section className="space-y-4">
+    <div className="space-y-4">
+
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-white">
-          🎨 Fundo Animado
-        </h3>
+        <div className="flex items-center gap-2">
+          <div className="w-1 h-5 bg-gradient-to-b from-purple-400 to-pink-400 rounded-full"></div>
+          <h3 className="text-sm font-semibold text-white">
+            Fundo do Vídeo
+          </h3>
+        </div>
+        <span className="text-[10px] text-gray-500 font-mono bg-white/5 px-2 py-0.5 rounded">
+          {width}×{height}
+        </span>
+      </div>
+
+      {/* Status da imagem */}
+      {backgroundType === "ai-generated" && imageUrl && !isGeneratingImage && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <span className="text-xs text-emerald-300">Imagem gerada!</span>
+        </div>
+      )}
+
+      {/* Barra de progresso */}
+      {isGeneratingImage && (
+        <div className="space-y-2 p-3 rounded-lg bg-purple-500/5 border border-purple-500/20">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 text-purple-400 animate-spin" />
+              <span className="text-xs text-purple-300 font-medium">
+                Gerando imagem...
+              </span>
+            </div>
+            <span className="text-xs font-mono text-purple-400">
+              {Math.round(progress)}%
+            </span>
+          </div>
+          <div className="w-full h-1.5 bg-purple-500/20 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-purple-400 to-pink-400 transition-all duration-300 rounded-full"
+              style={{ width: `${Math.min(progress, 100)}%` }}
+            />
+          </div>
+          <div className="text-[10px] text-gray-400 text-center">
+            {getStatusMessage()}
+          </div>
+        </div>
+      )}
+
+      {/* Erro */}
+      {error && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
+          <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+          <span className="text-xs text-red-300">{error}</span>
+        </div>
+      )}
+
+      {/* Botões */}
+      <div className="grid grid-cols-2 gap-2">
         <button
-          onClick={handleRandom}
-          disabled={isRandomizing}
+          onClick={handleGenerateAI}
+          disabled={isGeneratingImage}
           className={`
-            px-4 py-2 rounded-lg font-semibold transition text-sm
-            ${isRandomizing
-              ? "bg-gray-700 cursor-not-allowed"
-              : "bg-purple-600 hover:bg-purple-500 text-white"
+            group relative flex items-center justify-center gap-2 px-4 py-3 rounded-xl
+            font-medium text-sm transition-all duration-200
+            ${isGeneratingImage
+              ? "bg-gray-700/50 cursor-not-allowed opacity-60"
+              : "bg-gradient-to-r from-purple-600/20 to-pink-600/20 hover:from-purple-600/30 hover:to-pink-600/30 border border-purple-500/30 hover:border-purple-400/50 text-white"
             }
           `}
         >
-          {isRandomizing ? "⏳" : "🎲"} Aleatório
+          {isGeneratingImage ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Gerando...</span>
+            </>
+          ) : (
+            <>
+              <Wand2 className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+              <span>Gerar com IA</span>
+            </>
+          )}
+        </button>
+
+        <button
+          onClick={() => {
+            onTypeChange("solid");
+            onImageChange("", "");
+            setError(null);
+            setProgress(0);
+            if (onLoadingChange) onLoadingChange(false);
+          }}
+          disabled={isGeneratingImage}
+          className={`
+            flex items-center justify-center gap-2 px-4 py-3 rounded-xl
+            font-medium text-sm transition-all duration-200
+            ${isGeneratingImage
+              ? "bg-gray-700/50 cursor-not-allowed opacity-60"
+              : backgroundType === "solid"
+                ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-300"
+                : "bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white"
+            }
+          `}
+        >
+          <Palette className="w-4 h-4" />
+          <span>Sólido</span>
         </button>
       </div>
 
-      {/* Tipos de animação */}
-      <div className="space-y-2">
-        <label className="block text-sm text-gray-300">
-          Tipo de animação
-        </label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {animations.map((anim) => (
-            <button
-              key={anim.value}
-              onClick={() => onAnimationChange(anim.value)}
-              className={`
-                rounded-lg p-3 text-center transition-all duration-200
-                ${animationType === anim.value
-                  ? "bg-green-600 text-white border-2 border-green-400 shadow-lg shadow-green-900/30"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent"
-                }
-              `}
-            >
-              <div className="text-2xl">{anim.icon}</div>
-              <div className="text-xs font-medium mt-1">{anim.label}</div>
-              <div className="text-[10px] text-gray-400 mt-0.5">{anim.description}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Cor de fundo */}
-      <div className="space-y-2">
-        <label className="block text-sm text-gray-300">
-          Cor de fundo
-        </label>
-        <div className="grid grid-cols-5 sm:grid-cols-10 gap-1">
-          {backgroundColors.map((color) => (
-            <button
-              key={color.value}
-              onClick={() => onColorChange(color.value)}
-              className={`
-                w-full aspect-square rounded-lg border-2 transition-all
-                ${backgroundColor === color.value
-                  ? "border-green-400 scale-110"
-                  : "border-gray-700 hover:border-gray-500"
-                }
-              `}
-              style={{ backgroundColor: color.value }}
-              title={color.label}
-            />
-          ))}
-        </div>
-        <div className="text-xs text-gray-400 text-center">
-          Cor atual: <span className="font-mono">{backgroundColor}</span>
-        </div>
-      </div>
-
-      {/* Posição da animação - DESABILITADA se "Sem animação" */}
-      <div className="space-y-2">
-        <label className="block text-sm text-gray-300">
-          Posição da animação
-        </label>
-        <div className="grid grid-cols-4 gap-2">
-          {positions.map((pos) => (
-            <button
-              key={pos.value}
-              onClick={() => isAnimationEnabled && onPositionChange(pos.value)}
-              disabled={!isAnimationEnabled}
-              className={`
-                rounded-lg p-3 text-center transition-all duration-200
-                ${!isAnimationEnabled
-                  ? "bg-gray-700 text-gray-500 cursor-not-allowed opacity-50"
-                  : position === pos.value
-                    ? "bg-green-600 text-white border-2 border-green-400"
-                    : "bg-gray-800 text-gray-300 hover:bg-gray-700 border-2 border-transparent"
-                }
-              `}
-            >
-              <div className="text-xl">{pos.icon}</div>
-              <div className="text-xs font-medium mt-1">{pos.label}</div>
-            </button>
-          ))}
-        </div>
-        {!isAnimationEnabled && (
-          <p className="text-xs text-gray-500 text-center">
-            ⚠️ Selecione uma animação para configurar a posição
-          </p>
-        )}
-      </div>
-
-      {/* Preview da posição */}
-      <div className="space-y-2">
-        <label className="block text-sm text-gray-300">
-          Prévia da posição
-        </label>
-        <div
-          className="relative w-full h-20 rounded-lg overflow-hidden border border-gray-700"
-          style={{ backgroundColor }}
-        >
-          <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-300">
-            {isAnimationEnabled ? (
-              <>
-                <span className="mr-1">{animations.find(a => a.value === animationType)?.icon}</span>
-                <span>{animations.find(a => a.value === animationType)?.label}</span>
-              </>
-            ) : (
-              "Fundo sólido"
-            )}
+      {/* Cores (apenas sólido) */}
+      {backgroundType === "solid" && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] text-gray-400 uppercase tracking-wider">
+              Cores disponíveis
+            </label>
+            <span className="text-[10px] text-gray-500">
+              {backgroundColors.length} cores
+            </span>
           </div>
-          {isAnimationEnabled && (
-            <div
-              className={`
-                absolute bg-white/20 border-2 border-white/50 transition-all duration-300
-                ${position === "full" ? "inset-0" : ""}
-                ${position === "top-half" ? "inset-x-0 top-0 h-1/2" : ""}
-                ${position === "center" ? "inset-x-0 top-1/4 h-1/2" : ""}
-                ${position === "bottom-half" ? "inset-x-0 bottom-0 h-1/2" : ""}
-              `}
+          <div className="grid grid-cols-7 gap-1.5">
+            {backgroundColors.map((color) => (
+              <button
+                key={color.value}
+                onClick={() => onColorChange(color.value)}
+                disabled={isGeneratingImage}
+                className={`
+                  group relative w-full aspect-square rounded-lg border-2 transition-all duration-200
+                  ${isGeneratingImage
+                    ? "cursor-not-allowed opacity-50"
+                    : backgroundColor === color.value
+                      ? "border-emerald-400 scale-110 shadow-lg shadow-emerald-500/20"
+                      : "border-gray-700 hover:border-gray-500 hover:scale-105"
+                  }
+                `}
+                style={{ backgroundColor: color.value }}
+                title={color.label}
+              >
+                {backgroundColor === color.value && (
+                  <Check className="absolute inset-0 m-auto w-3 h-3 text-white drop-shadow-lg" />
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-gray-500">
+              Cor atual: <span className="font-mono text-gray-400">{backgroundColor}</span>
+            </span>
+            <button
+              onClick={() => onColorChange(getRandomColor())}
+              disabled={isGeneratingImage}
+              className="text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
             >
-              <div className="absolute inset-0 flex items-center justify-center text-xs text-white font-semibold">
-                {position === "full" ? "Tela inteira" : ""}
-                {position === "top-half" ? "Topo" : ""}
-                {position === "center" ? "Centro" : ""}
-                {position === "bottom-half" ? "Base" : ""}
-              </div>
-            </div>
-          )}
+              Aleatório
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Informação sobre performance */}
-      {isAnimationEnabled && (
-        <div className="rounded-lg bg-yellow-900/20 border border-yellow-700 p-3">
-          <p className="text-xs text-yellow-300">
-            ⚡ Animações podem aumentar o tempo de renderização.
-            <br />
-            Recomendado para vídeos curtos (até 30 segundos).
+      {/* Dica */}
+      {backgroundType === "ai-generated" && !imageUrl && !isGeneratingImage && !error && (
+        <div className="flex items-start gap-2 p-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
+          <Sparkles className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
+          <p className="text-[10px] text-gray-400 leading-relaxed">
+            A imagem será gerada automaticamente com base no texto do vídeo.
           </p>
         </div>
       )}
-    </section>
+    </div>
   );
 }

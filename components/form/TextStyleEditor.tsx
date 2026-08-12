@@ -1,4 +1,4 @@
-// components/form/TextStyleEditor.tsx
+// components/form/TextStyleEditor.tsx - adicionar prop disabled em todos os inputs e selects
 "use client";
 
 import Input from "../ui/Input";
@@ -15,6 +15,7 @@ interface Props {
   onChange: (style: TextStyle) => void;
   showStyle?: boolean;
   showShadow?: boolean;
+  disabled?: boolean;
 }
 
 const fontOptions = [
@@ -48,16 +49,19 @@ export default function TextStyleEditor({
   onChange,
   showStyle = true,
   showShadow = true,
+  disabled = false,
 }: Props) {
 
   function update<K extends keyof TextStyle>(
     key: K,
     newValue: TextStyle[K]
   ) {
-    onChange({
-      ...value,
-      [key]: newValue,
-    });
+    if (!disabled) {
+      onChange({
+        ...value,
+        [key]: newValue,
+      });
+    }
   }
 
   return (
@@ -80,6 +84,7 @@ export default function TextStyleEditor({
                 onChange={(e) =>
                   update("fontFamily", e.target.value)
                 }
+                disabled={disabled}
               />
             </div>
 
@@ -100,6 +105,7 @@ export default function TextStyleEditor({
                     Number(e.target.value)
                   )
                 }
+                disabled={disabled}
               />
             </div>
 
@@ -119,6 +125,7 @@ export default function TextStyleEditor({
                 onChange={(e) =>
                   update("color", e.target.value)
                 }
+                disabled={disabled}
               />
             </div>
 
@@ -137,6 +144,7 @@ export default function TextStyleEditor({
                     e.target.value
                   )
                 }
+                disabled={disabled}
               />
             </div>
 
@@ -157,6 +165,7 @@ export default function TextStyleEditor({
                     Number(e.target.value)
                   )
                 }
+                disabled={disabled}
               />
             </div>
 
@@ -179,6 +188,7 @@ export default function TextStyleEditor({
                     e.target.value as TextAlign
                   )
                 }
+                disabled={disabled}
               />
             </div>
 
@@ -197,6 +207,7 @@ export default function TextStyleEditor({
                     e.target.value as TextVerticalPosition
                   )
                 }
+                disabled={disabled}
               />
             </div>
 
@@ -219,6 +230,7 @@ export default function TextStyleEditor({
                     e.target.value
                   )
                 }
+                disabled={disabled}
               />
             </div>
 
@@ -239,6 +251,7 @@ export default function TextStyleEditor({
                     Number(e.target.value)
                   )
                 }
+                disabled={disabled}
               />
             </div>
 
@@ -258,6 +271,7 @@ export default function TextStyleEditor({
               onChange={(e) =>
                 update("shadow", e.target.checked)
               }
+              disabled={disabled}
             />
             <span className="text-gray-300">
               Adicionar sombra
@@ -283,6 +297,7 @@ export default function TextStyleEditor({
                       e.target.value
                     )
                   }
+                  disabled={disabled}
                 />
               </div>
 
@@ -303,6 +318,7 @@ export default function TextStyleEditor({
                       Number(e.target.value)
                     )
                   }
+                  disabled={disabled}
                 />
               </div>
 
@@ -323,6 +339,7 @@ export default function TextStyleEditor({
                       Number(e.target.value)
                     )
                   }
+                  disabled={disabled}
                 />
               </div>
 
@@ -343,6 +360,7 @@ export default function TextStyleEditor({
                       Number(e.target.value)
                     )
                   }
+                  disabled={disabled}
                 />
               </div>
 

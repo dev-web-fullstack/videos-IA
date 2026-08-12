@@ -1,3 +1,4 @@
+// lib/utils.ts
 import fs from "fs";
 import path from "path";
 
@@ -17,7 +18,7 @@ export function ensureTempFolder() {
     console.log("📁 Pasta temporária criada:", dir);
   }
 
-  // Limpar arquivos temporários antigos (mais de 1 hora)
+  // Limpar arquivos temporários antigos
   try {
     const files = fs.readdirSync(dir);
     const now = Date.now();

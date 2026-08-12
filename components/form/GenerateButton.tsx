@@ -1,3 +1,4 @@
+// components/form/GenerateButton.tsx
 import Button from "../../components/ui/Button";
 
 interface GenerateButtonProps {

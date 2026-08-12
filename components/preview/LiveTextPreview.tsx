@@ -1,17 +1,20 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import type { TextStyle } from "../../lib/textStyle";
 import { buildTextLayout } from "../../lib/textLayout";
-import { BackgroundAnimationType, BackgroundPosition } from "../../lib/backgroundAnimations";
+import { BackgroundType } from "../../lib/backgroundAnimations";
 
 interface Props {
   text: string;
   width: number;
   height: number;
   style: TextStyle;
-  backgroundAnimation?: BackgroundAnimationType;
-  backgroundPosition?: BackgroundPosition;
+  backgroundType?: BackgroundType;
   backgroundColor?: string;
+  backgroundImage?: string;
+  isGeneratingImage?: boolean;
+  onImageDisplayed?: () => void;
 }
 
 export default function LiveTextPreview({
@@ -19,13 +22,36 @@ export default function LiveTextPreview({
   width,
   height,
   style,
-  backgroundAnimation = "none",
-  backgroundPosition = "full",
+  backgroundType = "solid",
   backgroundColor = "#000000",
+  backgroundImage,
+  isGeneratingImage = false,
+  onImageDisplayed,
 }: Props) {
 
   const MAX_WIDTH = 420;
   const MAX_HEIGHT = 300;
+  const [imageDisplayed, setImageDisplayed] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const onImageDisplayedRef = useRef(onImageDisplayed);
+  const isMounted = useRef(true);
+
+  // Manter a referência do callback atualizada
+  useEffect(() => {
+    onImageDisplayedRef.current = onImageDisplayed;
+  }, [onImageDisplayed]);
+
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const scale = Math.min(
     MAX_WIDTH / width,
@@ -88,45 +114,94 @@ export default function LiveTextPreview({
       break;
   }
 
-  const getBackgroundStyle = () => {
-    if (backgroundAnimation === "none") {
-      return backgroundColor;
+  const isImageBackground = backgroundType === "ai-generated" && backgroundImage;
+
+  // CARREGAR IMAGEM - CORRIGIDO
+  useEffect(() => {
+    // Resetar estado
+    setImageDisplayed(false);
+
+    // Limpar timeout anterior
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
     }
 
-    switch (backgroundAnimation) {
-      case "gradient-wave":
-        return `linear-gradient(45deg, ${backgroundColor}, #ff6b6b, #4ecdc4, ${backgroundColor})`;
-      case "particles":
-        return `radial-gradient(circle at 20% 50%, ${backgroundColor}, #ff6b6b44)`;
-      case "waves":
-        return `repeating-linear-gradient(45deg, ${backgroundColor}, #4ecdc444 10px, ${backgroundColor} 20px)`;
-      case "geometric-rotate":
-        return `conic-gradient(from 0deg, ${backgroundColor}, #ff6b6b, #4ecdc4, ${backgroundColor})`;
-      case "light-pulse":
-        return `radial-gradient(circle at center, #ffffff22, ${backgroundColor})`;
-      default:
-        return backgroundColor;
+    // Se não for imagem ou estiver gerando, não fazer nada
+    if (!isImageBackground || isGeneratingImage || !backgroundImage) {
+      setImageDisplayed(false);
+      return;
     }
-  };
 
-  const getAnimationPosition = () => {
-    switch (backgroundPosition) {
-      case "top-half":
-        return { top: 0, height: "50%" };
-      case "center":
-        return { top: "25%", height: "50%" };
-      case "bottom-half":
-        return { top: "50%", height: "50%" };
-      case "full":
-      default:
-        return { top: 0, height: "100%" };
+    // Criar imagem para teste
+    const img = new (window as any).Image();
+
+    const handleLoad = () => {
+      if (isMounted.current) {
+        setImageDisplayed(true);
+        if (onImageDisplayedRef.current) {
+          onImageDisplayedRef.current();
+        }
+      }
+    };
+
+    const handleError = () => {
+      // Se der erro, tentar novamente após 1s
+      if (isMounted.current) {
+        timeoutRef.current = setTimeout(() => {
+          if (isMounted.current) {
+            setImageDisplayed(true);
+            if (onImageDisplayedRef.current) {
+              onImageDisplayedRef.current();
+            }
+          }
+        }, 1000);
+      }
+    };
+
+    img.onload = handleLoad;
+    img.onerror = handleError;
+    img.src = backgroundImage;
+
+    // Se a imagem já estiver carregada
+    if (img.complete) {
+      handleLoad();
+    } else {
+      // Timeout de segurança
+      timeoutRef.current = setTimeout(() => {
+        if (isMounted.current && !imageDisplayed) {
+          setImageDisplayed(true);
+          if (onImageDisplayedRef.current) {
+            onImageDisplayedRef.current();
+          }
+        }
+      }, 5000);
     }
-  };
 
-  const animPosition = getAnimationPosition();
+    return () => {
+      img.onload = null;
+      img.onerror = null;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
+  }, [backgroundImage, isGeneratingImage, isImageBackground]);
 
-  // USAR DIRETAMENTE O NOME DA FONTE SEM MAPEAMENTO
-  const fontFamily = style.fontFamily;
+  // Quando a imagem é gerada, notificar
+  useEffect(() => {
+    if (!isGeneratingImage && isImageBackground && backgroundImage) {
+      const timer = setTimeout(() => {
+        if (isMounted.current) {
+          setImageDisplayed(true);
+          if (onImageDisplayedRef.current) {
+            onImageDisplayedRef.current();
+          }
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isGeneratingImage, isImageBackground, backgroundImage]);
 
   return (
     <section className="space-y-4">
@@ -143,21 +218,49 @@ export default function LiveTextPreview({
             backgroundColor: backgroundColor,
           }}
         >
-          {backgroundAnimation !== "none" && (
-            <div
-              className="absolute"
-              style={{
-                top: animPosition.top,
-                left: 0,
-                width: "100%",
-                height: animPosition.height,
-                background: getBackgroundStyle(),
-                opacity: 0.5,
-                transition: "all 0.5s ease",
-              }}
-            />
+          {/* Fundo com imagem */}
+          {isImageBackground && !isGeneratingImage && (
+            <div className="absolute inset-0 w-full h-full">
+              <img
+                ref={imgRef}
+                src={backgroundImage}
+                alt="Fundo gerado por IA"
+                className="w-full h-full object-cover"
+                onLoad={() => {
+                  if (isMounted.current) {
+                    setImageDisplayed(true);
+                    if (onImageDisplayedRef.current) {
+                      onImageDisplayedRef.current();
+                    }
+                  }
+                }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                  if (isMounted.current) {
+                    setTimeout(() => {
+                      setImageDisplayed(true);
+                      if (onImageDisplayedRef.current) {
+                        onImageDisplayedRef.current();
+                      }
+                    }, 500);
+                  }
+                }}
+              />
+            </div>
           )}
 
+          {/* Placeholder de carregamento */}
+          {isGeneratingImage && (
+            <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-900/40 to-blue-900/40 backdrop-blur-sm">
+              <div className="text-center">
+                <div className="text-4xl mb-2 animate-pulse">🎨</div>
+                <div className="text-sm text-white/80 font-medium">Gerando imagem...</div>
+                <div className="text-xs text-white/50 mt-1">Aguarde, isso pode levar alguns segundos</div>
+              </div>
+            </div>
+          )}
+
+          {/* Área do texto */}
           <div
             className="absolute inset-0 flex"
             style={{
@@ -173,7 +276,7 @@ export default function LiveTextPreview({
                 width: "100%",
                 textAlign: textAlign,
                 color: style.color,
-                fontFamily: fontFamily,
+                fontFamily: style.fontFamily,
                 fontSize: style.fontSize * scale,
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",
@@ -221,9 +324,10 @@ export default function LiveTextPreview({
             </div>
           </div>
 
-          {backgroundAnimation !== "none" && (
-            <div className="absolute top-2 right-2 bg-black/60 rounded-full px-2 py-0.5 text-[8px] text-white/70 border border-white/20">
-              🎨 {backgroundAnimation}
+          {/* Indicador do tipo de fundo */}
+          {!isGeneratingImage && (
+            <div className="absolute bottom-2 right-2 bg-black/60 rounded-full px-2 py-0.5 text-[8px] text-white/70 border border-white/20 z-20">
+              {isImageBackground ? "🎨 IA" : "⬛ Sólido"}
             </div>
           )}
         </div>
@@ -231,7 +335,8 @@ export default function LiveTextPreview({
 
       <div className="text-center text-xs text-gray-400">
         {width} × {height} | {lines.length} linhas
-        {backgroundAnimation !== "none" && ` | 🎨 ${backgroundAnimation}`}
+        {isImageBackground && !isGeneratingImage && " | 🎨 Fundo gerado por IA"}
+        {isGeneratingImage && " | ⏳ Gerando imagem..."}
         {style.align === "justify" && " | 📐 Justificado"}
         {style.verticalPosition !== "center" && ` | 📍 ${style.verticalPosition === "top" ? "⬆️ Cima" : "⬇️ Baixo"}`}
         <br />

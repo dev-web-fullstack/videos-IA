@@ -7,6 +7,7 @@ interface CustomSizeInputProps {
   height: number;
   onWidthChange: (value: number) => void;
   onHeightChange: (value: number) => void;
+  disabled?: boolean;
 }
 
 export default function CustomSizeInput({
@@ -14,6 +15,7 @@ export default function CustomSizeInput({
   height,
   onWidthChange,
   onHeightChange,
+  disabled = false,
 }: CustomSizeInputProps) {
   return (
     <section className="space-y-6">
@@ -24,12 +26,14 @@ export default function CustomSizeInput({
 
       <div className="grid lg:grid-cols-2 gap-8 items-start">
 
+        {/* Campos */}
         <div className="space-y-5">
 
           <div className="space-y-2">
             <label htmlFor="custom-width" className="text-sm text-gray-300">
               Largura (px)
             </label>
+
             <Input
               id="custom-width"
               name="customWidth"
@@ -41,6 +45,7 @@ export default function CustomSizeInput({
               onChange={(e) =>
                 onWidthChange(Number(e.target.value))
               }
+              disabled={disabled}
             />
           </div>
 
@@ -48,6 +53,7 @@ export default function CustomSizeInput({
             <label htmlFor="custom-height" className="text-sm text-gray-300">
               Altura (px)
             </label>
+
             <Input
               id="custom-height"
               name="customHeight"
@@ -59,6 +65,7 @@ export default function CustomSizeInput({
               onChange={(e) =>
                 onHeightChange(Number(e.target.value))
               }
+              disabled={disabled}
             />
           </div>
 
@@ -72,8 +79,14 @@ export default function CustomSizeInput({
 
         </div>
 
+        {/* Prévia */}
         <div className="space-y-4">
-          <VideoPreview width={width} height={height} />
+
+          <VideoPreview
+            width={width}
+            height={height}
+          />
+
           <div className="text-center text-sm text-gray-400">
             Resolução atual:
             <span className="font-semibold text-white">
@@ -81,6 +94,7 @@ export default function CustomSizeInput({
               {width} × {height}
             </span>
           </div>
+
         </div>
 
       </div>

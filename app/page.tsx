@@ -1,6 +1,17 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import {
+  Video,
+  Loader2,
+  Shield,
+  Eye,
+  FileText,
+  Monitor,
+  Palette,
+  Image,
+  Clock
+} from "lucide-react";
 
 import Header from "../components/layout/Header";
 import Card from "../components/ui/Card";
@@ -21,45 +32,39 @@ import {
   TextStyle,
 } from "../lib/textStyle";
 
-import {
-  BackgroundAnimationType,
-  BackgroundPosition,
-  backgroundColors,
-  getRandomBackgroundConfig
-} from "../lib/backgroundAnimations";
+import { BackgroundType } from "../lib/backgroundAnimations";
 
-type Section =
-  | "text"
-  | "style"
-  | "shadow"
-  | "background";
+type Tab = "text" | "style" | "background";
 
 export default function Home() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   const [script, setScript] = useState("");
-
   const [videoDuration, setVideoDuration] = useState(5);
-
   const [platform, setPlatform] = useState("youtube");
-
   const [width, setWidth] = useState(1920);
   const [height, setHeight] = useState(1080);
-
   const [videoResult, setVideoResult] = useState<any>(null);
 
-  const [openSection, setOpenSection] =
-    useState<Section>("text");
+  // Tabs
+  const [activeTab, setActiveTab] = useState<Tab>("text");
 
-  // Fundo animado
-  const [backgroundAnimation, setBackgroundAnimation] = useState<BackgroundAnimationType>("none");
-  const [backgroundPosition, setBackgroundPosition] = useState<BackgroundPosition>("full");
+  // Fundo
+  const [backgroundType, setBackgroundType] = useState<BackgroundType>("solid");
   const [backgroundColor, setBackgroundColor] = useState<string>("#000000");
+  const [backgroundImage, setBackgroundImage] = useState<string>("");
+  const [backgroundPrompt, setBackgroundPrompt] = useState<string>("");
+  const [imageLoadKey, setImageLoadKey] = useState(0);
+  const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Ref para controlar a barra de progresso
-  const progressBarRef = useRef<any>(null);
+  // Timeout para segurança - 50 segundos
+  const imageLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isMounted = useRef(true);
+  const imageLoadStartTimeRef = useRef<number>(0);
+  const isImageLoadingRef = useRef(false);
 
   //--------------------------------------
   // Estilo
@@ -74,6 +79,16 @@ export default function Home() {
     );
 
   //--------------------------------------
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+      if (imageLoadTimeoutRef.current) {
+        clearTimeout(imageLoadTimeoutRef.current);
+        imageLoadTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
 
@@ -120,6 +135,11 @@ export default function Home() {
       return;
     }
 
+    if (backgroundType === "ai-generated" && !backgroundImage) {
+      alert("Por favor, gere uma imagem de fundo com IA primeiro!");
+      return;
+    }
+
     setIsGenerating(true);
     setVideoResult(null);
 
@@ -136,9 +156,9 @@ export default function Home() {
           width,
           height,
           textStyle,
-          backgroundAnimation,
-          backgroundPosition,
+          backgroundType,
           backgroundColor,
+          imageUrl: backgroundType === "ai-generated" ? backgroundImage : undefined,
         }),
       });
 
@@ -146,10 +166,6 @@ export default function Home() {
 
       if (data.success) {
         setVideoResult(data);
-        // Finalizar a barra de progresso
-        if (progressBarRef.current?.finish) {
-          progressBarRef.current.finish();
-        }
       } else {
         console.error("Erro:", data.error);
         alert(data.error || "Erro ao gerar vídeo");
@@ -216,267 +232,332 @@ export default function Home() {
 
   //--------------------------------------
 
+  const handleImageLoading = (loading: boolean) => {
+    if (!isMounted.current) return;
+
+    setIsGeneratingImage(loading);
+
+    if (loading) {
+      isImageLoadingRef.current = true;
+      imageLoadStartTimeRef.current = Date.now();
+
+      // Limpar timeout anterior
+      if (imageLoadTimeoutRef.current) {
+        clearTimeout(imageLoadTimeoutRef.current);
+        imageLoadTimeoutRef.current = null;
+      }
+
+      // Timeout de segurança - 50 segundos (aumentado para segunda imagem)
+      imageLoadTimeoutRef.current = setTimeout(() => {
+        if (isMounted.current && isImageLoadingRef.current) {
+          console.warn("⏰ Timeout: liberando UI após 50s");
+          isImageLoadingRef.current = false;
+          setIsGeneratingImage(false);
+          setImageLoadKey(prev => prev + 1);
+          imageLoadTimeoutRef.current = null;
+        }
+      }, 50000); // 50 segundos
+
+    } else {
+      isImageLoadingRef.current = false;
+      if (imageLoadTimeoutRef.current) {
+        clearTimeout(imageLoadTimeoutRef.current);
+        imageLoadTimeoutRef.current = null;
+      }
+      setImageLoadKey(prev => prev + 1);
+    }
+  };
+
+  const handleImageDisplayed = () => {
+    if (!isMounted.current) return;
+
+    console.log("✅ Imagem exibida no preview!");
+    isImageLoadingRef.current = false;
+    setImageLoaded(true);
+    setIsGeneratingImage(false);
+    setImageLoadKey(prev => prev + 1);
+    if (imageLoadTimeoutRef.current) {
+      clearTimeout(imageLoadTimeoutRef.current);
+      imageLoadTimeoutRef.current = null;
+    }
+  };
+
+  // Verificar se algo está bloqueando a interface
+  const isBlocked = isGenerating || isDownloading || isGeneratingImage;
+
+  // Tabs com ícones
+  const tabs = [
+    { id: "text" as Tab, label: "Texto", icon: FileText },
+    { id: "style" as Tab, label: "Estilo", icon: Palette },
+    { id: "background" as Tab, label: "Fundo", icon: Image },
+  ];
+
   return (
 
-    <main className="min-h-screen bg-gray-950">
-
-      <div className="max-w-7xl mx-auto p-6">
-
-        <Header />
-
-        <VideoSizeSelector
-          platform={platform}
-          setPlatform={setPlatform}
-          width={width}
-          height={height}
-          setWidth={setWidth}
-          setHeight={setHeight}
-        />
-
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6">
-
-          {/* Sidebar */}
-
-          <Card>
-
-            <div className="space-y-4">
-
-              {/* Texto */}
-
-              <div className="border border-gray-800 rounded-lg overflow-hidden">
-
-                <button
-                  onClick={() =>
-                    setOpenSection("text")
-                  }
-                  className="w-full text-left px-4 py-3 bg-gray-900 hover:bg-gray-800 text-white font-semibold flex justify-between items-center"
-                >
-
-                  Texto do vídeo
-
-                  <span>
-
-                    {openSection === "text"
-                      ? "▲"
-                      : "▼"}
-
-                  </span>
-
-                </button>
-
-                {openSection === "text" && (
-
-                  <div className="p-4 space-y-4 bg-gray-950">
-
-                    <ScriptInput
-                      value={script}
-                      onChange={setScript}
-                    />
-
-                    <DurationInput
-                      value={videoDuration}
-                      onChange={
-                        setVideoDuration
-                      }
-                    />
-
-                  </div>
-
-                )}
-
-              </div>
-
-              {/* Aparência */}
-
-              <div className="border border-gray-800 rounded-lg overflow-hidden">
-
-                <button
-                  onClick={() =>
-                    setOpenSection("style")
-                  }
-                  className="w-full text-left px-4 py-3 bg-gray-900 hover:bg-gray-800 text-white font-semibold flex justify-between items-center"
-                >
-
-                  Aparência do texto
-
-                  <span>
-
-                    {openSection === "style"
-                      ? "▲"
-                      : "▼"}
-
-                  </span>
-
-                </button>
-
-                {openSection === "style" && (
-
-                  <div className="p-4 bg-gray-950">
-
-                    <TextStyleEditor
-                      value={textStyle}
-                      onChange={setTextStyle}
-                      showStyle
-                      showShadow={false}
-                    />
-
-                  </div>
-
-                )}
-
-              </div>
-
-              {/* Sombra */}
-
-              <div className="border border-gray-800 rounded-lg overflow-hidden">
-
-                <button
-                  onClick={() =>
-                    setOpenSection("shadow")
-                  }
-                  className="w-full text-left px-4 py-3 bg-gray-900 hover:bg-gray-800 text-white font-semibold flex justify-between items-center"
-                >
-
-                  Sombra do texto
-
-                  <span>
-
-                    {openSection === "shadow"
-                      ? "▲"
-                      : "▼"}
-
-                  </span>
-
-                </button>
-
-                {openSection === "shadow" && (
-
-                  <div className="p-4 bg-gray-950">
-
-                    <TextStyleEditor
-                      value={textStyle}
-                      onChange={setTextStyle}
-                      showStyle={false}
-                      showShadow
-                    />
-
-                  </div>
-
-                )}
-
-              </div>
-
-              {/* Fundo Animado */}
-
-              <div className="border border-gray-800 rounded-lg overflow-hidden">
-
-                <button
-                  onClick={() =>
-                    setOpenSection("background")
-                  }
-                  className="w-full text-left px-4 py-3 bg-gray-900 hover:bg-gray-800 text-white font-semibold flex justify-between items-center"
-                >
-
-                  🎨 Fundo Animado
-
-                  <span>
-
-                    {openSection === "background"
-                      ? "▲"
-                      : "▼"}
-
-                  </span>
-
-                </button>
-
-                {openSection === "background" && (
-
-                  <div className="p-4 bg-gray-950">
-
-                    <BackgroundSelector
-                      animationType={backgroundAnimation}
-                      position={backgroundPosition}
-                      backgroundColor={backgroundColor}
-                      onAnimationChange={setBackgroundAnimation}
-                      onPositionChange={setBackgroundPosition}
-                      onColorChange={setBackgroundColor}
-                    />
-
-                  </div>
-
-                )}
-
-              </div>
-
-              <GenerateButton
-                onClick={handleGenerateVideo}
-                disabled={isGenerating || isDownloading || script.trim().length === 0}
-                isGenerating={isGenerating}
-                label="🎬 Gerar Vídeo"
+    <main className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+
+      {/* Header */}
+      <div className="border-b border-white/5 bg-black/30 backdrop-blur-xl sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <Header />
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+
+        {/* Resolução e Status */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+              <Monitor className="w-4 h-4 text-blue-400" />
+              <span className="text-sm text-gray-300 font-mono">
+                {width} × {height}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+              <Clock className="w-4 h-4 text-green-400" />
+              <span className="text-sm text-gray-300">
+                {videoDuration}s
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {isGeneratingImage && (
+              <span className="text-xs text-purple-400 animate-pulse flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Gerando imagem...
+              </span>
+            )}
+            {isGenerating && (
+              <span className="text-xs text-yellow-400 animate-pulse flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Gerando vídeo...
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Layout Principal */}
+        <div className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-6">
+
+          {/* Sidebar - Controles */}
+          <div className="space-y-4">
+
+            {/* Video Size Selector */}
+            <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4">
+              <VideoSizeSelector
+                platform={platform}
+                setPlatform={setPlatform}
+                width={width}
+                height={height}
+                setWidth={setWidth}
+                setHeight={setHeight}
+                disabled={isBlocked}
               />
-
             </div>
 
-          </Card>
+            {/* Tabs Navigation */}
+            <div className="flex rounded-xl bg-white/5 border border-white/10 p-1">
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    disabled={isBlocked}
+                    className={`
+                      flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300
+                      ${isActive
+                        ? "bg-gradient-to-r from-purple-600/40 to-blue-600/40 text-white shadow-lg shadow-purple-900/20 border border-purple-500/30"
+                        : "text-gray-400 hover:text-white hover:bg-white/5"
+                      }
+                      ${isBlocked ? "opacity-50 cursor-not-allowed" : ""}
+                    `}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Conteúdo das Tabs */}
+            <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4 min-h-[400px] transition-all duration-300">
+              {activeTab === "text" && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="w-5 h-5 text-blue-400" />
+                    <h3 className="text-white font-semibold">Conteúdo do Vídeo</h3>
+                  </div>
+                  <ScriptInput
+                    value={script}
+                    onChange={setScript}
+                    disabled={isBlocked}
+                  />
+                  <DurationInput
+                    value={videoDuration}
+                    onChange={setVideoDuration}
+                    disabled={isBlocked}
+                  />
+                  <div className="text-xs text-gray-400 mt-2 flex items-center gap-2">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400"></span>
+                    {script.trim().length} caracteres
+                  </div>
+                </div>
+              )}
+
+              {activeTab === "style" && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Palette className="w-5 h-5 text-pink-400" />
+                    <h3 className="text-white font-semibold">Personalização do Texto</h3>
+                  </div>
+                  <TextStyleEditor
+                    value={textStyle}
+                    onChange={setTextStyle}
+                    showStyle
+                    showShadow={true}
+                    disabled={isBlocked}
+                  />
+                </div>
+              )}
+
+              {activeTab === "background" && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Image className="w-5 h-5 text-purple-400" />
+                    <h3 className="text-white font-semibold">Fundo do Vídeo</h3>
+                  </div>
+                  <BackgroundSelector
+                    key={imageLoadKey}
+                    backgroundType={backgroundType}
+                    backgroundColor={backgroundColor}
+                    imageUrl={backgroundImage}
+                    width={width}
+                    height={height}
+                    scriptText={script}
+                    onTypeChange={setBackgroundType}
+                    onColorChange={setBackgroundColor}
+                    onImageChange={(url, prompt) => {
+                      setBackgroundImage(url);
+                      setBackgroundPrompt(prompt);
+                    }}
+                    onLoadingChange={handleImageLoading}
+                    isGeneratingImage={isGeneratingImage}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Botão Gerar */}
+            <GenerateButton
+              onClick={handleGenerateVideo}
+              disabled={
+                isGeneratingImage ||
+                isGenerating ||
+                isDownloading ||
+                script.trim().length === 0 ||
+                (backgroundType === "ai-generated" && !backgroundImage)
+              }
+              isGenerating={isGenerating}
+              label="🎬 Gerar Vídeo"
+            />
+
+            {backgroundType === "ai-generated" && !backgroundImage && !isGeneratingImage && (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-900/30 border border-yellow-700/50 text-yellow-400 text-xs">
+                <Shield className="w-4 h-4" />
+                Gere uma imagem de fundo com IA primeiro!
+              </div>
+            )}
+
+            {isGeneratingImage && (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-900/30 border border-purple-700/50 text-purple-400 text-xs animate-pulse">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Carregando imagem... Aguarde!
+              </div>
+            )}
+
+          </div>
 
           {/* Preview */}
+          <div className="space-y-4">
 
-          <Card>
-
-            <div className="space-y-8">
-
-              <h2 className="text-2xl font-bold text-white">
-
-                Preview
-
-              </h2>
+            <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-white font-semibold flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-blue-400" />
+                  Preview
+                </h2>
+                <div className="flex items-center gap-2 text-xs text-gray-400">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400"></span>
+                  Ao vivo
+                </div>
+              </div>
 
               <LiveTextPreview
+                key={imageLoadKey}
                 text={script}
                 width={width}
                 height={height}
                 style={textStyle}
-                backgroundAnimation={backgroundAnimation}
-                backgroundPosition={backgroundPosition}
+                backgroundType={backgroundType}
                 backgroundColor={backgroundColor}
+                backgroundImage={backgroundImage}
+                isGeneratingImage={isGeneratingImage}
+                onImageDisplayed={handleImageDisplayed}
               />
-
-              {isGenerating && (
-                <ProgressBar
-                  ref={progressBarRef}
-                  duration={videoDuration}
-                  hasAnimation={backgroundAnimation !== "none"} // NOVO
-                />
-              )}
-
-              <ResultCard
-                result={videoResult}
-                onDownload={handleDownloadVideo}
-                isDownloading={isDownloading}
-                onDelete={() => setVideoResult(null)}
-              />
-
-              {!videoResult &&
-                !isGenerating && (
-
-                  <div className="flex items-center justify-center rounded-xl border-2 border-dashed border-gray-700 h-52">
-
-                    <span className="text-gray-500">
-
-                      Gere um vídeo para visualizar o resultado.
-
-                    </span>
-
-                  </div>
-
-                )}
-
             </div>
 
-          </Card>
+            {isGenerating && (
+              <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4">
+                <ProgressBar
+                  duration={videoDuration}
+                  hasAnimation={false}
+                />
+              </div>
+            )}
+
+            <ResultCard
+              result={videoResult}
+              onDownload={handleDownloadVideo}
+              isDownloading={isDownloading}
+              onDelete={() => setVideoResult(null)}
+            />
+
+            {!videoResult && !isGenerating && (
+              <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/5 p-8 min-h-[200px]">
+                <Video className="w-12 h-12 text-gray-600 mb-3" />
+                <span className="text-gray-500 text-sm text-center">
+                  Gere um vídeo para visualizar o resultado
+                </span>
+                <span className="text-gray-600 text-xs mt-1">
+                  Configure o texto, estilo e fundo, depois clique em "Gerar Vídeo"
+                </span>
+              </div>
+            )}
+
+          </div>
 
         </div>
 
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-white/5 mt-8 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-gray-500">
+            <span>© 2026 Videos IA - Criado com ❤️</span>
+            <div className="flex items-center gap-4">
+              <span>✨ Gerador de Vídeos com IA</span>
+              <span className="w-px h-3 bg-gray-700"></span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400"></span>
+                Online
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
     </main>

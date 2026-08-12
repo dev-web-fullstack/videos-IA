@@ -2,7 +2,6 @@
 import { NextResponse } from "next/server";
 import { generateVideoFromText } from "../../../lib/ffmpeg";
 import type { TextStyle } from "../../../lib/textStyle";
-import type { BackgroundAnimationType, BackgroundPosition } from "../../../lib/backgroundAnimations";
 
 export async function POST(req: Request) {
   try {
@@ -15,9 +14,9 @@ export async function POST(req: Request) {
       width,
       height,
       textStyle,
-      backgroundAnimation = "none",
-      backgroundPosition = "full",
+      backgroundType = "solid",
       backgroundColor = "#000000",
+      imageUrl,
     }: {
       script: string;
       videoDuration: number;
@@ -25,29 +24,14 @@ export async function POST(req: Request) {
       width: number;
       height: number;
       textStyle: TextStyle;
-      backgroundAnimation?: BackgroundAnimationType;
-      backgroundPosition?: BackgroundPosition;
+      backgroundType?: string;
       backgroundColor?: string;
+      imageUrl?: string;
     } = body;
 
-    // Validação
     if (!script?.trim()) {
       return NextResponse.json(
         { success: false, error: "Texto vazio" },
-        { status: 400 }
-      );
-    }
-
-    if (!videoDuration || videoDuration < 1) {
-      return NextResponse.json(
-        { success: false, error: "Duração inválida" },
-        { status: 400 }
-      );
-    }
-
-    if (!width || !height || width < 1 || height < 1) {
-      return NextResponse.json(
-        { success: false, error: "Resolução inválida" },
         { status: 400 }
       );
     }
@@ -56,10 +40,10 @@ export async function POST(req: Request) {
     console.log("📝 Texto:", script);
     console.log("⏱️ Duração:", videoDuration);
     console.log("📐 Resolução:", `${width}x${height}`);
-    console.log("🎨 Fundo:", backgroundAnimation, "| Posição:", backgroundPosition);
+    console.log("🎨 Fundo:", backgroundType);
     console.log("🎨 Cor:", backgroundColor);
+    if (imageUrl) console.log("🖼️ Imagem:", imageUrl);
 
-    // Gerar vídeo
     const videoPath = await generateVideoFromText(
       script,
       videoDuration,
@@ -67,17 +51,14 @@ export async function POST(req: Request) {
       width,
       height,
       textStyle,
-      backgroundAnimation,
-      backgroundPosition,
-      backgroundColor
+      backgroundType,
+      backgroundColor,
+      imageUrl
     );
 
     if (!videoPath) {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Erro ao gerar vídeo: caminho não retornado"
-        },
+        { success: false, error: "Erro ao gerar vídeo" },
         { status: 500 }
       );
     }
