@@ -10,7 +10,8 @@ import {
   Monitor,
   Palette,
   Image,
-  Clock
+  Clock,
+  Images
 } from "lucide-react";
 
 import Header from "../components/layout/Header";
@@ -22,6 +23,7 @@ import VideoSizeSelector from "../components/form/VideoSizeSelector";
 import GenerateButton from "../components/form/GenerateButton";
 import TextStyleEditor from "../components/form/TextStyleEditor";
 import BackgroundSelector from "../components/form/BackgroundSelector";
+import ImageUploader from "../components/form/ImageUploader";
 
 import ProgressBar from "../components/preview/ProgressBar";
 import ResultCard from "../components/preview/ResultCard";
@@ -34,7 +36,13 @@ import {
 
 import { BackgroundType } from "../lib/backgroundAnimations";
 
-type Tab = "text" | "style" | "background";
+type Tab = "text" | "style" | "background" | "images";
+
+interface OverlayImage {
+  path: string;
+  position: { x: number; y: number };
+  size: number;
+}
 
 export default function Home() {
 
@@ -58,12 +66,13 @@ export default function Home() {
   const [backgroundImage, setBackgroundImage] = useState<string>("");
   const [backgroundPrompt, setBackgroundPrompt] = useState<string>("");
   const [imageLoadKey, setImageLoadKey] = useState(0);
-  const [imageLoaded, setImageLoaded] = useState(false);
 
-  // Timeout para segurança - 50 segundos
+  // Overlay images
+  const [overlayImages, setOverlayImages] = useState<OverlayImage[]>([]);
+
+  // Timeout para segurança
   const imageLoadTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isMounted = useRef(true);
-  const imageLoadStartTimeRef = useRef<number>(0);
   const isImageLoadingRef = useRef(false);
 
   //--------------------------------------
@@ -130,11 +139,7 @@ export default function Home() {
   //--------------------------------------
 
   async function handleGenerateVideo() {
-    if (!script.trim()) {
-      alert("Digite um texto primeiro!");
-      return;
-    }
-
+    // Verificar se tem imagem de fundo IA quando necessário
     if (backgroundType === "ai-generated" && !backgroundImage) {
       alert("Por favor, gere uma imagem de fundo com IA primeiro!");
       return;
@@ -150,7 +155,7 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          script,
+          script: script || "",
           videoDuration,
           platform,
           width,
@@ -159,6 +164,7 @@ export default function Home() {
           backgroundType,
           backgroundColor,
           imageUrl: backgroundType === "ai-generated" ? backgroundImage : undefined,
+          overlayImages: overlayImages.length > 0 ? overlayImages : undefined,
         }),
       });
 
@@ -239,15 +245,12 @@ export default function Home() {
 
     if (loading) {
       isImageLoadingRef.current = true;
-      imageLoadStartTimeRef.current = Date.now();
 
-      // Limpar timeout anterior
       if (imageLoadTimeoutRef.current) {
         clearTimeout(imageLoadTimeoutRef.current);
         imageLoadTimeoutRef.current = null;
       }
 
-      // Timeout de segurança - 50 segundos (aumentado para segunda imagem)
       imageLoadTimeoutRef.current = setTimeout(() => {
         if (isMounted.current && isImageLoadingRef.current) {
           console.warn("⏰ Timeout: liberando UI após 50s");
@@ -256,7 +259,7 @@ export default function Home() {
           setImageLoadKey(prev => prev + 1);
           imageLoadTimeoutRef.current = null;
         }
-      }, 50000); // 50 segundos
+      }, 50000);
 
     } else {
       isImageLoadingRef.current = false;
@@ -273,7 +276,6 @@ export default function Home() {
 
     console.log("✅ Imagem exibida no preview!");
     isImageLoadingRef.current = false;
-    setImageLoaded(true);
     setIsGeneratingImage(false);
     setImageLoadKey(prev => prev + 1);
     if (imageLoadTimeoutRef.current) {
@@ -285,11 +287,15 @@ export default function Home() {
   // Verificar se algo está bloqueando a interface
   const isBlocked = isGenerating || isDownloading || isGeneratingImage;
 
+  // Verificar se tem texto
+  const hasText = script && script.trim().length > 0;
+
   // Tabs com ícones
-  const tabs = [
-    { id: "text" as Tab, label: "Texto", icon: FileText },
-    { id: "style" as Tab, label: "Estilo", icon: Palette },
-    { id: "background" as Tab, label: "Fundo", icon: Image },
+  const tabs: { id: Tab; label: string; icon: any }[] = [
+    { id: "text", label: "Texto", icon: FileText },
+    { id: "style", label: "Estilo", icon: Palette },
+    { id: "background", label: "Fundo", icon: Image },
+    { id: "images", label: "Imagens", icon: Images },
   ];
 
   return (
@@ -403,6 +409,9 @@ export default function Home() {
                   <div className="text-xs text-gray-400 mt-2 flex items-center gap-2">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400"></span>
                     {script.trim().length} caracteres
+                    {!hasText && (
+                      <span className="text-yellow-400 text-[10px]"> (sem texto)</span>
+                    )}
                   </div>
                 </div>
               )}
@@ -419,6 +428,7 @@ export default function Home() {
                     showStyle
                     showShadow={true}
                     disabled={isBlocked}
+                    hasText={!!hasText} // CONVERTER PARA BOOLEAN
                   />
                 </div>
               )}
@@ -448,16 +458,35 @@ export default function Home() {
                   />
                 </div>
               )}
+
+              {activeTab === "images" && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Images className="w-5 h-5 text-blue-400" />
+                    <h3 className="text-white font-semibold">Imagens do Vídeo</h3>
+                  </div>
+                  <ImageUploader
+                    onImagesChange={setOverlayImages}
+                    selectedImages={overlayImages}
+                    disabled={isBlocked}
+                  />
+                  {overlayImages.length > 0 && (
+                    <div className="text-xs text-gray-400">
+                      📷 {overlayImages.length} imagem(ns) adicionada(s).
+                      Clique para selecionar • Arraste para mover • Bordas para redimensionar
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Botão Gerar */}
+            {/* Botão Gerar - LIBERADO MESMO SEM TEXTO */}
             <GenerateButton
               onClick={handleGenerateVideo}
               disabled={
                 isGeneratingImage ||
                 isGenerating ||
                 isDownloading ||
-                script.trim().length === 0 ||
                 (backgroundType === "ai-generated" && !backgroundImage)
               }
               isGenerating={isGenerating}
@@ -475,6 +504,14 @@ export default function Home() {
               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-purple-900/30 border border-purple-700/50 text-purple-400 text-xs animate-pulse">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Carregando imagem... Aguarde!
+              </div>
+            )}
+
+            {/* Aviso de que o vídeo será gerado sem texto */}
+            {!hasText && !isGenerating && !isGeneratingImage && (
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-900/30 border border-blue-700/50 text-blue-400 text-xs">
+                <Info className="w-4 h-4" />
+                O vídeo será gerado sem texto (apenas fundo e imagens)
               </div>
             )}
 
@@ -504,8 +541,11 @@ export default function Home() {
                 backgroundType={backgroundType}
                 backgroundColor={backgroundColor}
                 backgroundImage={backgroundImage}
+                overlayImages={overlayImages}
+                onOverlayImagesChange={setOverlayImages}
                 isGeneratingImage={isGeneratingImage}
                 onImageDisplayed={handleImageDisplayed}
+                activeTab={activeTab}
               />
             </div>
 
@@ -564,4 +604,15 @@ export default function Home() {
 
   );
 
+}
+
+// Componente Info para o aviso
+function Info(props: any) {
+  return (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
+    </svg>
+  );
 }

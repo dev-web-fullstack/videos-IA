@@ -65,15 +65,12 @@ export function createDefaultTextStyle({
     shadowBlur: Math.round(fontSize * 0.08),
 
     backgroundColor: "#000000",
-    backgroundOpacity: 100,
+    backgroundOpacity: 0,
 
     padding: Math.round(fontSize * 0.35),
     borderRadius: Math.round(fontSize * 0.30),
-
-    // MARGENS REDUZIDAS - 2% para texto ficar mais perto das bordas
-    marginX: Math.round(width * 0.01),
-    marginY: Math.round(height * 0.01),
-
+    marginX: Math.round(width * 0.02),
+    marginY: Math.round(height * 0.02),
     lineSpacing: Math.round(fontSize * 0.35),
     align: "center",
     verticalPosition: "center",

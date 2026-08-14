@@ -1,7 +1,7 @@
 // components/form/BackgroundSelector.tsx
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   Sparkles,
   Palette,
@@ -47,55 +47,36 @@ export default function BackgroundSelector({
 
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
-  const isMounted = useRef(true);
 
-  // Cleanup on unmount
   useEffect(() => {
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
-
-  // Simular progresso enquanto gera - CORRIGIDO
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-
     if (isGeneratingImage) {
       setProgress(0);
       setError(null);
-      interval = setInterval(() => {
+      const interval = setInterval(() => {
         setProgress(prev => {
           if (prev >= 95) return prev;
           return prev + Math.random() * 8;
         });
       }, 200);
+      return () => clearInterval(interval);
     } else {
-      // Quando para de gerar, definir progresso como 100 apenas se for > 0
-      // e se o componente ainda estiver montado
-      if (isMounted.current) {
-        setProgress(100);
-      }
+      setProgress(100);
     }
-
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
   }, [isGeneratingImage]);
 
   const handleGenerateAI = async () => {
-    if (!scriptText || scriptText.trim().length === 0) {
-      setError("❌ Digite um texto no vídeo primeiro!");
-      return;
-    }
+    // REMOVIDA a obrigatoriedade de texto
+    // Se não houver texto, usa um prompt padrão
+    const textToUse = scriptText && scriptText.trim().length > 0
+      ? scriptText
+      : "Paisagem bíblica com luz divina, natureza, paz e esperança";
 
     if (onLoadingChange) onLoadingChange(true);
     setError(null);
     setProgress(0);
 
     try {
-      const url = generatePollinationsUrlFromText(scriptText, width, height);
+      const url = generatePollinationsUrlFromText(textToUse, width, height);
       const promptMatch = url.match(/\/prompt\/([^?]+)/);
       const prompt = promptMatch ? decodeURIComponent(promptMatch[1]) : "Prompt gerado";
       onTypeChange("ai-generated");
@@ -126,7 +107,6 @@ export default function BackgroundSelector({
   return (
     <div className="space-y-4">
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-1 h-5 bg-gradient-to-b from-purple-400 to-pink-400 rounded-full"></div>
@@ -139,7 +119,6 @@ export default function BackgroundSelector({
         </span>
       </div>
 
-      {/* Status da imagem */}
       {backgroundType === "ai-generated" && imageUrl && !isGeneratingImage && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
           <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
@@ -147,7 +126,6 @@ export default function BackgroundSelector({
         </div>
       )}
 
-      {/* Barra de progresso */}
       {isGeneratingImage && (
         <div className="space-y-2 p-3 rounded-lg bg-purple-500/5 border border-purple-500/20">
           <div className="flex items-center justify-between">
@@ -173,7 +151,6 @@ export default function BackgroundSelector({
         </div>
       )}
 
-      {/* Erro */}
       {error && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
           <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
@@ -181,7 +158,6 @@ export default function BackgroundSelector({
         </div>
       )}
 
-      {/* Botões */}
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={handleGenerateAI}
@@ -233,7 +209,6 @@ export default function BackgroundSelector({
         </button>
       </div>
 
-      {/* Cores (apenas sólido) */}
       {backgroundType === "solid" && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -283,12 +258,14 @@ export default function BackgroundSelector({
         </div>
       )}
 
-      {/* Dica */}
       {backgroundType === "ai-generated" && !imageUrl && !isGeneratingImage && !error && (
         <div className="flex items-start gap-2 p-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
           <Sparkles className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
           <p className="text-[10px] text-gray-400 leading-relaxed">
             A imagem será gerada automaticamente com base no texto do vídeo.
+            {(!scriptText || scriptText.trim().length === 0) && (
+              <span className="text-blue-400"> (Texto vazio: usando prompt padrão)</span>
+            )}
           </p>
         </div>
       )}

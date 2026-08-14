@@ -6,18 +6,21 @@ import https from 'https';
 
 import { getVideoConfig } from "./videoConfig";
 import { buildTextLayout } from "./textLayout";
-import { ensureVideoFolder, ensureTempFolder, clearAllVideos } from "./utils";
+import { ensureVideoFolder, ensureTempFolder, clearAllVideos, clearTempFolder } from "./utils";
 
 import type { TextStyle } from "./textStyle";
 
-// Função para baixar imagem via HTTPS com validação
+interface OverlayImage {
+  path: string;
+  position: { x: number; y: number };
+  size: number;
+  aspectRatio?: number;
+}
+
 function downloadImage(url: string, dest: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(dest);
-    let responseReceived = false;
-
     https.get(url, (response) => {
-      // Verificar se é um redirecionamento
       if (response.statusCode === 302 || response.statusCode === 301) {
         const redirectUrl = response.headers.location;
         if (redirectUrl) {
@@ -25,58 +28,10 @@ function downloadImage(url: string, dest: string): Promise<void> {
           return;
         }
       }
-
-      // Verificar se a resposta é uma imagem (content-type)
-      const contentType = response.headers['content-type'] || '';
-      if (!contentType.includes('image/')) {
-        // Se não for imagem, pode ser um erro JSON
-        let data = '';
-        response.on('data', (chunk) => {
-          data += chunk.toString();
-        });
-        response.on('end', () => {
-          try {
-            const json = JSON.parse(data);
-            if (json.error) {
-              reject(new Error(`Erro da API: ${json.error}`));
-            } else {
-              reject(new Error(`Resposta inesperada: ${contentType}`));
-            }
-          } catch (e) {
-            reject(new Error(`Conteúdo não é uma imagem: ${contentType}`));
-          }
-        });
-        return;
-      }
-
-      responseReceived = true;
       response.pipe(file);
       file.on('finish', () => {
         file.close();
-        // Verificar se o arquivo é uma imagem PNG válida
-        try {
-          const buffer = fs.readFileSync(dest);
-          // Verificar assinatura PNG: 89 50 4E 47
-          if (buffer.length > 4 &&
-            buffer[0] === 0x89 &&
-            buffer[1] === 0x50 &&
-            buffer[2] === 0x4E &&
-            buffer[3] === 0x47) {
-            resolve();
-          } else if (buffer.length > 4 &&
-            buffer[0] === 0xFF &&
-            buffer[1] === 0xD8 &&
-            buffer[2] === 0xFF) {
-            // É JPEG - aceitar também
-            resolve();
-          } else {
-            // Não é PNG nem JPEG
-            const preview = buffer.slice(0, 100).toString();
-            reject(new Error(`Arquivo não é uma imagem válida: ${preview}`));
-          }
-        } catch (err) {
-          reject(new Error(`Erro ao validar imagem: ${err}`));
-        }
+        resolve();
       });
     }).on('error', (err) => {
       fs.unlink(dest, () => { });
@@ -85,34 +40,27 @@ function downloadImage(url: string, dest: string): Promise<void> {
   });
 }
 
-// Função para tentar baixar com retry
-async function downloadImageWithRetry(url: string, dest: string, maxRetries: number = 3): Promise<void> {
-  let lastError: Error | null = null;
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`🔄 Tentativa ${attempt}/${maxRetries} de baixar imagem...`);
-      await downloadImage(url, dest);
-      console.log(`✅ Imagem baixada com sucesso!`);
+function getImageAspectRatio(imagePath: string): Promise<number> {
+  return new Promise((resolve) => {
+    if (imagePath.startsWith('http')) {
+      resolve(1);
       return;
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      console.warn(`⚠️ Tentativa ${attempt} falhou: ${lastError.message}`);
-
-      // Limpar arquivo se existir
-      try {
-        if (fs.existsSync(dest)) fs.unlinkSync(dest);
-      } catch (e) { }
-
-      // Esperar antes de tentar novamente
-      if (attempt < maxRetries) {
-        console.log(`⏳ Aguardando 1s antes da próxima tentativa...`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
     }
-  }
 
-  throw new Error(`Falha ao baixar imagem após ${maxRetries} tentativas: ${lastError?.message}`);
+    try {
+      const sharp = require('sharp');
+      sharp(imagePath)
+        .metadata()
+        .then((metadata: any) => {
+          resolve(metadata.width / metadata.height);
+        })
+        .catch(() => {
+          resolve(1);
+        });
+    } catch (e) {
+      resolve(1);
+    }
+  });
 }
 
 export async function generateVideoFromText(
@@ -124,7 +72,8 @@ export async function generateVideoFromText(
   textStyle: TextStyle,
   backgroundType: string = "solid",
   backgroundColor: string = "#000000",
-  imageUrl?: string
+  imageUrl?: string,
+  overlayImages?: OverlayImage[]
 ): Promise<string> {
 
   clearAllVideos();
@@ -156,102 +105,96 @@ export async function generateVideoFromText(
     fontFamily: textStyle.fontFamily,
   });
 
-  if (!script.trim()) {
-    throw new Error("Texto vazio.");
+  const hasText = script && script.trim().length > 0;
+
+  let layout;
+  let drawTextFilter = "";
+
+  if (hasText) {
+    layout = buildTextLayout({
+      text: script,
+      width,
+      height,
+      fontSize: textStyle.fontSize,
+      marginX: textStyle.marginX,
+      align: textStyle.align,
+    });
+
+    const textContent = layout.text;
+    fs.writeFileSync(tempTextFile, textContent, "utf-8");
+
+    const fontFile = config.fontFile
+      .replace(/\\/g, "/")
+      .replace(/:/g, "\\:");
+
+    const textFileEscaped = tempTextFile
+      .replace(/\\/g, "/")
+      .replace(/:/g, "\\:")
+      .replace(/'/g, "\\'");
+
+    drawTextFilter = `drawtext=fontfile='${fontFile}':`;
+    drawTextFilter += `textfile='${textFileEscaped}':`;
+    drawTextFilter += `fontcolor=${textStyle.color}:`;
+    drawTextFilter += `fontsize=${textStyle.fontSize}:`;
+
+    if (textStyle.borderWidth > 0) {
+      drawTextFilter += `borderw=${textStyle.borderWidth}:`;
+      drawTextFilter += `bordercolor=${textStyle.borderColor}:`;
+    }
+
+    if (textStyle.shadow) {
+      drawTextFilter += `shadowcolor=${textStyle.shadowColor}:`;
+      drawTextFilter += `shadowx=${textStyle.shadowX}:`;
+      drawTextFilter += `shadowy=${textStyle.shadowY}:`;
+    }
+
+    if (textStyle.backgroundOpacity > 0) {
+      const bgOpacity = (textStyle.backgroundOpacity / 100).toFixed(2);
+      drawTextFilter += `box=1:`;
+      drawTextFilter += `boxcolor=${textStyle.backgroundColor}@${bgOpacity}:`;
+      const paddingX = Math.round(textStyle.padding * 0.5);
+      drawTextFilter += `boxborderw=${paddingX}:`;
+    }
+
+    let textAlignValue = "";
+    switch (textStyle.align) {
+      case "left": textAlignValue = "L"; break;
+      case "right": textAlignValue = "R"; break;
+      case "justify": textAlignValue = "L"; break;
+      default: textAlignValue = "C"; break;
+    }
+
+    drawTextFilter += `text_align=${textAlignValue}:`;
+
+    let xPosition = "";
+    switch (textStyle.align) {
+      case "left": xPosition = `${textStyle.marginX}`; break;
+      case "right": xPosition = `w-text_w-${textStyle.marginX}`; break;
+      case "justify": xPosition = `(w-text_w)/2`; break;
+      default: xPosition = `(w-text_w)/2`; break;
+    }
+
+    drawTextFilter += `x=${xPosition}:`;
+
+    let yPosition = "";
+    switch (textStyle.verticalPosition) {
+      case "top": yPosition = `${textStyle.marginY}`; break;
+      case "bottom": yPosition = `h-text_h-${textStyle.marginY}`; break;
+      default: yPosition = `(h-text_h)/2`; break;
+    }
+
+    drawTextFilter += `y=${yPosition}:`;
+
+    const lineSpacing = Math.round(textStyle.lineSpacing * 0.5);
+    drawTextFilter += `line_spacing=${lineSpacing}:`;
+    drawTextFilter += `font='${textStyle.fontFamily}':`;
+    drawTextFilter += `expansion=none:`;
+
+    drawTextFilter = drawTextFilter.replace(/\n/g, "").replace(/\s+/g, "");
+  } else {
+    layout = { text: "", lines: [], maxCharsPerLine: 0, align: textStyle.align };
+    drawTextFilter = "";
   }
-
-  const layout = buildTextLayout({
-    text: script,
-    width,
-    height,
-    fontSize: textStyle.fontSize,
-    marginX: textStyle.marginX,
-    align: textStyle.align,
-  });
-
-  const textContent = layout.text;
-  fs.writeFileSync(tempTextFile, textContent, "utf-8");
-
-  const fontFile = config.fontFile
-    .replace(/\\/g, "/")
-    .replace(/:/g, "\\:");
-
-  let drawTextFilter = `drawtext=fontfile='${fontFile}':`;
-
-  const textFileEscaped = tempTextFile
-    .replace(/\\/g, "/")
-    .replace(/:/g, "\\:")
-    .replace(/'/g, "\\'");
-
-  drawTextFilter += `textfile='${textFileEscaped}':`;
-
-  drawTextFilter += `fontcolor=${textStyle.color}:`;
-  drawTextFilter += `fontsize=${textStyle.fontSize}:`;
-
-  if (textStyle.borderWidth > 0) {
-    drawTextFilter += `borderw=${textStyle.borderWidth}:`;
-    drawTextFilter += `bordercolor=${textStyle.borderColor}:`;
-  }
-
-  if (textStyle.shadow) {
-    drawTextFilter += `shadowcolor=${textStyle.shadowColor}:`;
-    drawTextFilter += `shadowx=${textStyle.shadowX}:`;
-    drawTextFilter += `shadowy=${textStyle.shadowY}:`;
-  }
-
-  if (textStyle.backgroundOpacity > 0) {
-    const bgOpacity = (textStyle.backgroundOpacity / 100).toFixed(2);
-    drawTextFilter += `box=1:`;
-    drawTextFilter += `boxcolor=${textStyle.backgroundColor}@${bgOpacity}:`;
-    const paddingX = Math.round(textStyle.padding * 0.5);
-    drawTextFilter += `boxborderw=${paddingX}:`;
-  }
-
-  let textAlignValue = "";
-  switch (textStyle.align) {
-    case "left": textAlignValue = "L"; break;
-    case "right": textAlignValue = "R"; break;
-    case "justify": textAlignValue = "L"; break;
-    default: textAlignValue = "C"; break;
-  }
-
-  drawTextFilter += `text_align=${textAlignValue}:`;
-
-  let xPosition = "";
-  switch (textStyle.align) {
-    case "left":
-      xPosition = `${textStyle.marginX}`;
-      break;
-    case "right":
-      xPosition = `w-text_w-${textStyle.marginX}`;
-      break;
-    case "justify":
-      // Para justificado, centralizar a caixa mas o texto já está justificado
-      xPosition = `(w-text_w)/2`;
-      break;
-    case "center":
-    default:
-      xPosition = `(w-text_w)/2`;
-      break;
-  }
-
-  drawTextFilter += `x=${xPosition}:`;
-
-  let yPosition = "";
-  switch (textStyle.verticalPosition) {
-    case "top": yPosition = `${textStyle.marginY}`; break;
-    case "bottom": yPosition = `h-text_h-${textStyle.marginY}`; break;
-    default: yPosition = `(h-text_h)/2`; break;
-  }
-
-  drawTextFilter += `y=${yPosition}:`;
-
-  const lineSpacing = Math.round(textStyle.lineSpacing * 0.5);
-  drawTextFilter += `line_spacing=${lineSpacing}:`;
-  drawTextFilter += `font='${textStyle.fontFamily}':`;
-  drawTextFilter += `expansion=none:`;
-
-  drawTextFilter = drawTextFilter.replace(/\n/g, "").replace(/\s+/g, "");
 
   console.log("\n==============================");
   console.log("🎬 GERANDO VÍDEO");
@@ -261,162 +204,71 @@ export async function generateVideoFromText(
   console.log("⏱️  Duração:", videoDuration, "segundos");
   console.log("🎨 Tipo de fundo:", backgroundType);
   console.log("🎨 Cor:", backgroundColor);
-  if (imageUrl) console.log("🖼️ Imagem:", imageUrl);
+  if (imageUrl) console.log("🖼️ Imagem IA:", imageUrl);
+  if (overlayImages && overlayImages.length > 0) {
+    console.log(`📷 Overlays: ${overlayImages.length} imagem(ns)`);
+  }
+  console.log("📝 Texto:", hasText ? `"${script}"` : "(vazio)");
   console.log("📐 Alinhamento H:", textStyle.align);
   console.log("📐 Posição V:", textStyle.verticalPosition);
-  console.log("📄 Texto com quebras:");
-  console.log(layout.text);
   console.log("📁 Salvando em:", outputPath);
   console.log("==============================\n");
 
-  // Função para gerar vídeo com imagem de fundo
-  async function generateWithImage(): Promise<void> {
-    // Baixar a imagem com retry
-    console.log("🖼️ Baixando imagem de fundo...");
+  // ============================================
+  // ABORDAGEM SIMPLIFICADA: USAR ARQUIVOS INTERMEDIÁRIOS
+  // ============================================
 
-    try {
-      await downloadImageWithRetry(imageUrl!, tempBgFile, 3);
-    } catch (error) {
-      console.error("❌ Erro ao baixar imagem:", error);
-      // Fallback: usar fundo sólido
-      console.warn("⚠️ Usando fundo sólido como fallback...");
-      await generateWithSolid();
-      return;
-    }
+  async function createBackground(): Promise<string> {
+    const bgHex = backgroundColor.replace('#', '');
+    const bgOutput = path.join(tempDir, `bg-${timestamp}.mp4`);
 
-    // Verificar se o arquivo existe e tem tamanho
-    if (!fs.existsSync(tempBgFile) || fs.statSync(tempBgFile).size === 0) {
-      console.warn("⚠️ Arquivo de imagem vazio ou inexistente. Usando fundo sólido...");
-      await generateWithSolid();
-      return;
-    }
+    let bgArgs: string[];
 
-    console.log("✅ Imagem baixada com sucesso!");
-
-    return new Promise((resolve, reject) => {
-      // CORREÇÃO: Usar o FFmpeg para redimensionar e criar o vídeo em UM PASSO
-      const args = [
+    if (imageUrl && fs.existsSync(tempBgFile)) {
+      bgArgs = [
         "-y",
         "-loop", "1",
         "-i", tempBgFile,
-        "-vf", `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2,${drawTextFilter}`,
-        "-c:v", config.videoCodec,
+        "-vf", `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2`,
+        "-c:v", "libx264",
         "-t", String(videoDuration),
-        "-pix_fmt", config.pixelFormat,
+        "-pix_fmt", "yuv420p",
         "-r", String(config.fps),
-        "-preset", "medium",
-        "-crf", "23",
-        outputPath,
+        bgOutput,
       ];
-
-      console.log("🔧 Gerando vídeo final...");
-
-      const ffmpeg = spawn("ffmpeg", args);
-      let hasError = false;
-      let errorMessage = "";
-
-      ffmpeg.stderr.on("data", (data) => {
-        const message = data.toString();
-
-        if (message.includes("Fontconfig") ||
-          message.includes("configuration file") ||
-          message.includes("Press [q] to stop")) {
-          return;
-        }
-
-        if (message.includes("Error") || message.includes("Invalid")) {
-          hasError = true;
-          errorMessage = message;
-          console.error("❌ FFmpeg erro:", message);
-        }
-
-        if (message.includes("frame=") || message.includes("time=")) {
-          const progress = message.match(/time=(\d+:\d+:\d+\.\d+)/);
-          if (progress) {
-            console.log(`⏳ Progresso: ${progress[1]}`);
-          }
-        }
-      });
-
-      ffmpeg.on("close", (code) => {
-        // Limpar arquivos temporários
-        try {
-          if (fs.existsSync(tempTextFile)) fs.unlinkSync(tempTextFile);
-          if (fs.existsSync(tempBgFile)) fs.unlinkSync(tempBgFile);
-        } catch (e) { }
-
-        if (code === 0 && fs.existsSync(outputPath)) {
-          const fileSize = fs.statSync(outputPath).size;
-          console.log(`✅ Vídeo gerado com sucesso! Tamanho: ${fileSize} bytes`);
-          resolve();
-        } else {
-          reject(new Error(errorMessage || `Código ${code}`));
-        }
-      });
-
-      ffmpeg.on("error", (error) => {
-        reject(error);
-      });
-    });
-  }
-
-  // Função para gerar vídeo com fundo sólido
-  async function generateWithSolid(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      const bgHex = backgroundColor.replace('#', '');
-      const args = [
+    } else {
+      bgArgs = [
         "-y",
         "-f", "lavfi",
         "-i", `color=c=${bgHex}:s=${width}x${height}:d=${videoDuration}`,
-        "-vf", drawTextFilter,
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
         "-r", String(config.fps),
-        "-c:v", config.videoCodec,
-        "-pix_fmt", config.pixelFormat,
-        "-preset", "medium",
-        "-crf", "23",
-        outputPath,
+        bgOutput,
       ];
+    }
 
-      console.log("🔧 Gerando vídeo com fundo sólido...");
+    console.log("🔧 Criando fundo...");
 
-      const ffmpeg = spawn("ffmpeg", args);
-      let hasError = false;
-      let errorMessage = "";
+    return new Promise((resolve, reject) => {
+      const ffmpeg = spawn("ffmpeg", bgArgs);
 
       ffmpeg.stderr.on("data", (data) => {
         const message = data.toString();
-
-        if (message.includes("Fontconfig") ||
-          message.includes("configuration file") ||
-          message.includes("Press [q] to stop")) {
-          return;
-        }
-
-        if (message.includes("Error") || message.includes("Invalid")) {
-          hasError = true;
-          errorMessage = message;
-          console.error("❌ FFmpeg erro:", message);
-        }
-
         if (message.includes("frame=") || message.includes("time=")) {
           const progress = message.match(/time=(\d+:\d+:\d+\.\d+)/);
           if (progress) {
-            console.log(`⏳ Progresso: ${progress[1]}`);
+            console.log(`⏳ Fundo: ${progress[1]}`);
           }
         }
       });
 
       ffmpeg.on("close", (code) => {
-        try {
-          if (fs.existsSync(tempTextFile)) fs.unlinkSync(tempTextFile);
-        } catch (e) { }
-
-        if (code === 0 && fs.existsSync(outputPath)) {
-          const fileSize = fs.statSync(outputPath).size;
-          console.log(`✅ Vídeo gerado com sucesso! Tamanho: ${fileSize} bytes`);
-          resolve();
+        if (code === 0 && fs.existsSync(bgOutput)) {
+          console.log("✅ Fundo criado!");
+          resolve(bgOutput);
         } else {
-          reject(new Error(errorMessage || `Código ${code}`));
+          reject(new Error("Erro ao criar fundo"));
         }
       });
 
@@ -426,12 +278,235 @@ export async function generateVideoFromText(
     });
   }
 
-  // Executar a geração correta
-  if (backgroundType === "ai-generated" && imageUrl) {
-    await generateWithImage();
-  } else {
-    await generateWithSolid();
+  async function addOverlays(baseVideo: string, overlays: OverlayImage[]): Promise<string> {
+    let currentVideo = baseVideo;
+
+    for (let i = 0; i < overlays.length; i++) {
+      const img = overlays[i];
+      const outputVideo = path.join(tempDir, `overlay-${timestamp}-${i}.mp4`);
+
+      let overlayPath = "";
+
+      if (img.path.startsWith('/images/')) {
+        const localPath = path.join(process.cwd(), 'public', img.path);
+        if (fs.existsSync(localPath)) {
+          overlayPath = localPath;
+        } else {
+          console.warn(`⚠️ Overlay ${i + 1} não encontrado`);
+          continue;
+        }
+      } else if (img.path.startsWith('http')) {
+        const tempOverlayFile = path.join(tempDir, `overlay-${timestamp}-${i}.png`);
+        try {
+          await downloadImage(img.path, tempOverlayFile);
+          overlayPath = tempOverlayFile;
+        } catch (error) {
+          console.warn(`⚠️ Erro ao baixar overlay ${i + 1}`);
+          continue;
+        }
+      }
+
+      if (!overlayPath || !fs.existsSync(overlayPath)) {
+        console.warn(`⚠️ Overlay ${i + 1} não encontrado`);
+        continue;
+      }
+
+      let aspectRatio = img.aspectRatio || 1;
+
+      if (!img.aspectRatio) {
+        try {
+          const sharp = require('sharp');
+          const metadata = await sharp(overlayPath).metadata();
+          aspectRatio = metadata.width / metadata.height;
+          console.log(`   📐 Proporção calculada: ${aspectRatio.toFixed(2)}:1`);
+        } catch (e) {
+          console.warn(`   ⚠️ Não foi possível calcular proporção, usando 1:1`);
+          aspectRatio = 1;
+        }
+      } else {
+        console.log(`   📐 Proporção: ${aspectRatio.toFixed(2)}:1`);
+      }
+
+      const baseSize = Math.min(width, height);
+      const overlaySize = Math.round(baseSize * (img.size / 100));
+
+      let overlayWidth = overlaySize;
+      let overlayHeight = overlaySize / aspectRatio;
+
+      if (overlayHeight > overlaySize) {
+        overlayHeight = overlaySize;
+        overlayWidth = overlaySize * aspectRatio;
+      }
+
+      const posX = (img.position.x / 100) * width;
+      const posY = (img.position.y / 100) * height;
+
+      console.log(`🔧 Adicionando overlay ${i + 1}`);
+      console.log(`   Tamanho: ${img.size}% = ${overlaySize}px (base: ${baseSize}px)`);
+      console.log(`   Dimensões: ${Math.round(overlayWidth)}x${Math.round(overlayHeight)}`);
+      console.log(`   Posição: ${Math.round(posX)}x${Math.round(posY)}`);
+
+      const filterComplex = `[1:v]scale=${Math.round(overlayWidth)}:${Math.round(overlayHeight)}[overlay];[0:v][overlay]overlay=${posX}:${posY}[out]`;
+
+      const args = [
+        "-y",
+        "-i", currentVideo,
+        "-i", overlayPath,
+        "-filter_complex", filterComplex,
+        "-map", "[out]",
+        "-c:v", "libx264",
+        "-pix_fmt", "yuv420p",
+        "-preset", "medium",
+        "-crf", "23",
+        outputVideo,
+      ];
+
+      console.log(`🔧 Comando: ffmpeg ${args.join(" ")}`);
+
+      await new Promise<void>((resolve, reject) => {
+        const ffmpeg = spawn("ffmpeg", args);
+
+        ffmpeg.stderr.on("data", (data) => {
+          const message = data.toString();
+          if (message.includes("frame=") || message.includes("time=")) {
+            const progress = message.match(/time=(\d+:\d+:\d+\.\d+)/);
+            if (progress) {
+              console.log(`⏳ Overlay ${i + 1}: ${progress[1]}`);
+            }
+          }
+          if (message.includes("Error") || message.includes("Invalid")) {
+            console.error("❌ Erro FFmpeg:", message);
+          }
+        });
+
+        ffmpeg.on("close", (code) => {
+          if (code === 0 && fs.existsSync(outputVideo)) {
+            console.log(`✅ Overlay ${i + 1} adicionado!`);
+            resolve();
+          } else {
+            reject(new Error(`Erro ao adicionar overlay ${i + 1} (código ${code})`));
+          }
+        });
+
+        ffmpeg.on("error", (error) => {
+          reject(error);
+        });
+      });
+
+      if (fs.existsSync(currentVideo) && currentVideo !== baseVideo) {
+        try { fs.unlinkSync(currentVideo); } catch (e) { }
+      }
+
+      currentVideo = outputVideo;
+    }
+
+    return currentVideo;
   }
 
-  return `/videos/${outputFile}`;
+  async function addText(videoPath: string): Promise<string> {
+    if (!hasText || !drawTextFilter) {
+      return videoPath;
+    }
+
+    const outputVideo = path.join(tempDir, `final-${timestamp}.mp4`);
+
+    const args = [
+      "-y",
+      "-i", videoPath,
+      "-vf", drawTextFilter,
+      "-c:v", "libx264",
+      "-pix_fmt", "yuv420p",
+      "-preset", "medium",
+      "-crf", "23",
+      outputVideo,
+    ];
+
+    console.log("🔧 Adicionando texto...");
+
+    return new Promise((resolve, reject) => {
+      const ffmpeg = spawn("ffmpeg", args);
+
+      ffmpeg.stderr.on("data", (data) => {
+        const message = data.toString();
+        if (message.includes("frame=") || message.includes("time=")) {
+          const progress = message.match(/time=(\d+:\d+:\d+\.\d+)/);
+          if (progress) {
+            console.log(`⏳ Texto: ${progress[1]}`);
+          }
+        }
+        if (message.includes("Error") || message.includes("Invalid")) {
+          console.error("❌ Erro FFmpeg:", message);
+        }
+      });
+
+      ffmpeg.on("close", (code) => {
+        if (code === 0 && fs.existsSync(outputVideo)) {
+          console.log("✅ Texto adicionado!");
+          resolve(outputVideo);
+        } else {
+          reject(new Error(`Erro ao adicionar texto (código ${code})`));
+        }
+      });
+
+      ffmpeg.on("error", (error) => {
+        reject(error);
+      });
+    });
+  }
+
+  // ============================================
+  // EXECUTAR FLUXO
+  // ============================================
+
+  try {
+    if (imageUrl) {
+      try {
+        await downloadImage(imageUrl, tempBgFile);
+        console.log("✅ Imagem de fundo baixada!");
+      } catch (error) {
+        console.warn("⚠️ Erro ao baixar imagem de fundo, usando cor sólida");
+      }
+    }
+
+    let currentVideo = await createBackground();
+
+    if (overlayImages && overlayImages.length > 0) {
+      currentVideo = await addOverlays(currentVideo, overlayImages);
+    }
+
+    if (hasText) {
+      currentVideo = await addText(currentVideo);
+    }
+
+    if (fs.existsSync(outputPath)) {
+      try { fs.unlinkSync(outputPath); } catch (e) { }
+    }
+    fs.copyFileSync(currentVideo, outputPath);
+
+    // Limpar arquivos temporários individuais
+    try {
+      if (fs.existsSync(tempTextFile)) fs.unlinkSync(tempTextFile);
+      if (fs.existsSync(tempBgFile)) fs.unlinkSync(tempBgFile);
+      if (fs.existsSync(currentVideo) && currentVideo !== outputPath) {
+        fs.unlinkSync(currentVideo);
+      }
+    } catch (e) { }
+
+    // LIMPAR TODA A PASTA TMP
+    try {
+      clearTempFolder();
+      console.log("🧹 Pasta tmp limpa com sucesso!");
+    } catch (e) {
+      console.warn("⚠️ Erro ao limpar pasta tmp:", e);
+    }
+
+    const fileSize = fs.statSync(outputPath).size;
+    console.log(`✅ Vídeo final gerado! Tamanho: ${fileSize} bytes`);
+
+    return `/videos/${outputFile}`;
+
+  } catch (error) {
+    console.error("❌ Erro na geração do vídeo:", error);
+    throw error;
+  }
 }
