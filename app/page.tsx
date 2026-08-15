@@ -48,6 +48,7 @@ export default function Home() {
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [selectedTheme, setSelectedTheme] = useState<string>("sunset");
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
   const [script, setScript] = useState("");
@@ -449,12 +450,15 @@ export default function Home() {
                     scriptText={script}
                     onTypeChange={setBackgroundType}
                     onColorChange={setBackgroundColor}
-                    onImageChange={(url, prompt) => {
+                    onImageChange={(url, prompt, theme) => {
                       setBackgroundImage(url);
                       setBackgroundPrompt(prompt);
+                      if (theme) setSelectedTheme(theme);
                     }}
                     onLoadingChange={handleImageLoading}
                     isGeneratingImage={isGeneratingImage}
+                    selectedTheme={selectedTheme}
+                    onThemeChange={setSelectedTheme}
                   />
                 </div>
               )}

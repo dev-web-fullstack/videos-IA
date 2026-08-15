@@ -9,6 +9,7 @@ export interface BackgroundConfig {
   backgroundColor?: string;
   imageUrl?: string;
   prompt?: string;
+  theme?: string;
 }
 
 // Cores disponíveis para fundo sólido
@@ -29,134 +30,153 @@ export const backgroundColors = [
   { value: "#0a0a1a", label: "Azul profundo" },
 ];
 
-// Temas para paisagens
-const landscapeThemes = [
-  // Por do sol
-  'beautiful sunset over mountains, golden orange and pink sky, dramatic clouds, peaceful landscape, high quality, 4k, realistic',
-  'sunset over the sea, golden light reflecting on water, warm colors, tranquil scene, high quality, 4k, realistic',
-  'dramatic sunset over desert dunes, orange and purple sky, silhouette of mountains, high quality, 4k, realistic',
-  'sunset over a calm lake, golden reflections, pine trees silhouette, peaceful atmosphere, high quality, 4k, realistic',
+// ============================================
+// 8 TEMAS COM 8 PROMPTS CADA
+// ============================================
 
-  // Nascer do sol
-  'sunrise over mountains, golden light, mist in valleys, beautiful landscape, high quality, 4k, realistic',
-  'sunrise over the ocean, golden pink sky, gentle waves, peaceful morning, high quality, 4k, realistic',
-  'sunrise in the forest, rays of light through trees, magical atmosphere, high quality, 4k, realistic',
-  'sunrise over green hills, golden light, mist, beautiful rural landscape, high quality, 4k, realistic',
+export const backgroundThemes = {
+  // Tema 1: Por do Sol
+  sunset: {
+    name: "🌅 Por do Sol",
+    prompts: [
+      "dramatic sunset over mountains, orange and purple sky, golden light, beautiful landscape, high quality, 4k, peaceful atmosphere",
+      "sunset over the ocean, golden reflections on water, warm colors, tranquil scene, high quality, 4k, serene",
+      "spectacular sunset with clouds, pink and orange sky, dramatic lighting, landscape photography, high quality, 4k",
+      "sunset in the desert, golden dunes, warm tones, peaceful desert landscape, high quality, 4k, cinematic",
+      "sunset over a calm lake, mirror reflections, golden hour, beautiful nature, high quality, 4k, tranquil",
+      "romantic sunset with silhouetted trees, warm glow, peaceful evening, high quality, 4k, serene",
+      "sunset over rolling hills, golden light, beautiful countryside, high quality, 4k, peaceful landscape",
+      "tropical sunset with palm trees, vibrant colors, paradise scene, high quality, 4k, beautiful"
+    ]
+  },
 
-  // Montanhas
-  'snow-capped mountains at golden hour, dramatic landscape, alpine beauty, high quality, 4k, realistic',
-  'mountain lake with reflections, crystal clear water, majestic peaks, high quality, 4k, realistic',
-  'misty mountains at sunrise, layers of hills, atmospheric landscape, high quality, 4k, realistic',
-  'rocky mountains with waterfall, nature landscape, high quality, 4k, realistic',
+  // Tema 2: Nascer do Sol
+  sunrise: {
+    name: "🌄 Nascer do Sol",
+    prompts: [
+      "golden sunrise over mountains, mist in valleys, beautiful landscape, high quality, 4k, peaceful morning",
+      "sunrise over the ocean, golden pink sky, gentle waves, peaceful morning, high quality, 4k, serene",
+      "sunrise in the forest, rays of light through trees, magical atmosphere, high quality, 4k, beautiful",
+      "sunrise over green hills, golden light, misty landscape, high quality, 4k, peaceful",
+      "sunrise over a calm river, golden reflections, peaceful nature, high quality, 4k, tranquil",
+      "sunrise over the city skyline, golden light, beautiful urban landscape, high quality, 4k, cinematic",
+      "sunrise over a wheat field, golden light, beautiful countryside, high quality, 4k, serene",
+      "sunrise over the desert, warm golden tones, peaceful desert landscape, high quality, 4k, beautiful"
+    ]
+  },
 
-  // Florestas
-  'sunlight through forest canopy, green trees, peaceful woodland, high quality, 4k, realistic',
-  'autumn forest with golden leaves, colorful landscape, high quality, 4k, realistic',
-  'pine forest at sunset, warm light through trees, serene landscape, high quality, 4k, realistic',
-  'tropical forest with waterfall, lush vegetation, nature beauty, high quality, 4k, realistic',
+  // Tema 3: Montanhas
+  mountains: {
+    name: "🏔️ Montanhas",
+    prompts: [
+      "snow-capped mountains at golden hour, dramatic landscape, alpine beauty, high quality, 4k, majestic",
+      "mountain lake with crystal clear reflections, stunning landscape, high quality, 4k, peaceful",
+      "misty mountains at sunrise, layers of hills, atmospheric landscape, high quality, 4k, beautiful",
+      "rocky mountains with cascading waterfall, nature landscape, high quality, 4k, serene",
+      "mountain range with golden light, dramatic peaks, beautiful landscape, high quality, 4k, majestic",
+      "alpine valley with mountains, green meadows, stunning nature, high quality, 4k, peaceful",
+      "mountain sunrise with clouds, dramatic lighting, beautiful landscape, high quality, 4k, cinematic",
+      "snowy mountain peaks, clear blue sky, majestic landscape, high quality, 4k, serene"
+    ]
+  },
 
-  // Campos e vales
-  'green valley with flowers, rolling hills, beautiful landscape, high quality, 4k, realistic',
-  'golden wheat field at sunset, rural landscape, warm colors, high quality, 4k, realistic',
-  'lavender field in bloom, purple and green, beautiful landscape, high quality, 4k, realistic',
-  'spring meadow with flowers, vibrant colors, peaceful landscape, high quality, 4k, realistic',
+  // Tema 4: Florestas
+  forests: {
+    name: "🌲 Florestas",
+    prompts: [
+      "sunlight through forest canopy, green trees, peaceful woodland, high quality, 4k, serene",
+      "autumn forest with golden leaves, colorful landscape, beautiful nature, high quality, 4k, warm",
+      "pine forest at sunset, warm light through trees, serene landscape, high quality, 4k, peaceful",
+      "tropical forest with waterfall, lush vegetation, stunning nature, high quality, 4k, beautiful",
+      "mystical forest with fog, ethereal atmosphere, beautiful landscape, high quality, 4k, magical",
+      "green forest path, sunlight rays, peaceful woodland, high quality, 4k, serene",
+      "winter forest with snow, peaceful white landscape, high quality, 4k, tranquil",
+      "forest in spring with flowers, vibrant nature, high quality, 4k, beautiful"
+    ]
+  },
 
-  // Lagos e rios
-  'calm lake at sunset, reflections of trees, peaceful nature, high quality, 4k, realistic',
-  'river through a valley, crystal clear water, beautiful landscape, high quality, 4k, realistic',
-  'mountain lake with turquoise water, stunning landscape, high quality, 4k, realistic',
-  'waterfall in a tropical forest, beautiful nature, high quality, 4k, realistic',
+  // Tema 5: Lagos e Rios
+  lakes: {
+    name: "🏞️ Lagos e Rios",
+    prompts: [
+      "calm lake at sunset, reflections of mountains, peaceful nature, high quality, 4k, serene",
+      "river through a valley, crystal clear water, beautiful landscape, high quality, 4k, tranquil",
+      "mountain lake with turquoise water, stunning landscape, high quality, 4k, peaceful",
+      "peaceful lake with mist, reflections, serene nature, high quality, 4k, beautiful",
+      "river in the forest, golden light, peaceful nature, high quality, 4k, serene",
+      "lake surrounded by autumn trees, vibrant colors, beautiful landscape, high quality, 4k, warm",
+      "crystal clear mountain stream, pure water, high quality, 4k, peaceful",
+      "lake with water lilies, peaceful nature, high quality, 4k, beautiful"
+    ]
+  },
 
-  // Costas e praias
-  'beautiful beach at sunset, golden sand, calm waves, paradise, high quality, 4k, realistic',
-  'cliff by the sea, dramatic coastline, waves crashing, high quality, 4k, realistic',
-  'tropical beach with palm trees, turquoise water, paradise landscape, high quality, 4k, realistic',
+  // Tema 6: Campos e Vales
+  fields: {
+    name: "🌾 Campos e Vales",
+    prompts: [
+      "green valley with wildflowers, rolling hills, beautiful landscape, high quality, 4k, peaceful",
+      "golden wheat field at sunset, rural landscape, warm colors, high quality, 4k, serene",
+      "lavender field in bloom, purple and green, beautiful landscape, high quality, 4k, colorful",
+      "spring meadow with flowers, vibrant colors, peaceful landscape, high quality, 4k, beautiful",
+      "countryside with green fields, peaceful landscape, high quality, 4k, serene",
+      "valley with mist, dramatic landscape, high quality, 4k, atmospheric",
+      "golden fields at golden hour, beautiful rural landscape, high quality, 4k, warm",
+      "flower field in spring, colorful nature, high quality, 4k, beautiful"
+    ]
+  },
 
-  // Céu e nuvens
-  'golden sky with clouds, beautiful sunset, atmospheric, high quality, 4k, realistic',
-  'dramatic clouds at sunrise, colorful sky, landscape, high quality, 4k, realistic',
-  'starry night sky with Milky Way, magical atmosphere, high quality, 4k, realistic',
-];
+  // Tema 7: Céu e Nuvens
+  clouds: {
+    name: "☁️ Céu e Nuvens",
+    prompts: [
+      "dramatic clouds at sunset, colorful sky, atmospheric, high quality, 4k, beautiful",
+      "golden sky with clouds, warm colors, peaceful atmosphere, high quality, 4k, serene",
+      "starry night sky with Milky Way, magical atmosphere, high quality, 4k, beautiful",
+      "clouds with golden light at sunrise, dramatic sky, high quality, 4k, cinematic",
+      "blue sky with white clouds, peaceful atmosphere, high quality, 4k, serene",
+      "storm clouds with dramatic lighting, powerful atmosphere, high quality, 4k, dramatic",
+      "pink clouds at sunset, beautiful sky, high quality, 4k, romantic",
+      "golden sunset clouds, warm and peaceful, high quality, 4k, beautiful"
+    ]
+  },
 
-// Mapeamento de palavras-chave para temas específicos (mantido para compatibilidade)
-const keywords = {
-  natureza: ['natureza', 'paisagem', 'montanha', 'floresta', 'flor', 'animal', 'beleza'],
-  luz: ['luz', 'sol', 'nascer', 'pôr', 'brilho', 'clareza'],
-  paz: ['paz', 'calma', 'serenidade', 'tranquilidade', 'harmonia'],
+  // Tema 8: Abstrato
+  abstract: {
+    name: "🎨 Abstrato",
+    prompts: [
+      "flowing colors in abstract art, smooth gradient, vibrant, high quality, 4k, beautiful",
+      "golden light particles, abstract background, warm tones, high quality, 4k, elegant",
+      "abstract landscape with bold colors, artistic, high quality, 4k, vibrant",
+      "soft gradient with golden and blue tones, abstract art, high quality, 4k, peaceful",
+      "abstract geometry with light effects, modern art, high quality, 4k, sophisticated",
+      "golden fluid art, abstract waves, warm colors, high quality, 4k, elegant",
+      "abstract sunset colors, artistic background, high quality, 4k, vibrant",
+      "light and shadow abstract, dramatic contrast, high quality, 4k, artistic"
+    ]
+  }
 };
 
-// Detecta o tema do texto (simplificado para paisagens)
-function detectTheme(text: string): string {
-  const lowerText = text.toLowerCase();
+// Lista de temas para seleção
+export const themeKeys = Object.keys(backgroundThemes) as Array<keyof typeof backgroundThemes>;
 
-  if (lowerText.includes('natureza') || lowerText.includes('paisagem') ||
-    lowerText.includes('montanha') || lowerText.includes('floresta')) {
-    return 'natureza';
-  }
-  if (lowerText.includes('luz') || lowerText.includes('sol') ||
-    lowerText.includes('nascer') || lowerText.includes('pôr')) {
-    return 'luz';
-  }
-  if (lowerText.includes('paz') || lowerText.includes('calma') ||
-    lowerText.includes('serenidade') || lowerText.includes('tranquilidade')) {
-    return 'paz';
-  }
-  return 'natureza';
+// Função para obter um prompt aleatório de um tema específico
+export function getRandomPromptFromTheme(themeKey: keyof typeof backgroundThemes): string {
+  const theme = backgroundThemes[themeKey];
+  const prompts = theme.prompts;
+  return prompts[Math.floor(Math.random() * prompts.length)];
 }
 
-// Gera um prompt baseado no texto do vídeo
-export function generatePromptFromText(text: string): string {
-  // Se não houver texto, usa um prompt aleatório
-  if (!text || text.trim().length === 0) {
-    return landscapeThemes[Math.floor(Math.random() * landscapeThemes.length)];
-  }
-
-  const theme = detectTheme(text);
-
-  // Filtrar prompts baseado no tema
-  let filteredPrompts = [...landscapeThemes];
-
-  if (theme === 'natureza') {
-    filteredPrompts = landscapeThemes.filter(p =>
-      p.includes('forest') || p.includes('mountain') || p.includes('valley') ||
-      p.includes('tree') || p.includes('flower') || p.includes('green')
-    );
-  } else if (theme === 'luz') {
-    filteredPrompts = landscapeThemes.filter(p =>
-      p.includes('sun') || p.includes('light') || p.includes('golden') ||
-      p.includes('dawn') || p.includes('dusk') || p.includes('ray')
-    );
-  } else if (theme === 'paz') {
-    filteredPrompts = landscapeThemes.filter(p =>
-      p.includes('calm') || p.includes('peaceful') || p.includes('lake') ||
-      p.includes('serene') || p.includes('quiet') || p.includes('still')
-    );
-  }
-
-  // Se não houver prompts filtrados, usa todos
-  if (filteredPrompts.length === 0) {
-    filteredPrompts = landscapeThemes;
-  }
-
-  const randomPrompt = filteredPrompts[Math.floor(Math.random() * filteredPrompts.length)];
-
-  // Adicionar estilo cristão suave para manter o tema
-  return `${randomPrompt}, divine light, peaceful atmosphere, created by God`;
+// Função para obter um tema aleatório (para o botão de aleatório)
+export function getRandomTheme(): keyof typeof backgroundThemes {
+  return themeKeys[Math.floor(Math.random() * themeKeys.length)];
 }
 
-// Gerar URL da Pollinations.ai com base no texto
-export function generatePollinationsUrlFromText(
-  text: string,
-  width: number = 1920,
-  height: number = 1080
-): string {
-  const prompt = generatePromptFromText(text);
-  const encodedPrompt = encodeURIComponent(prompt);
-  const seed = Date.now().toString().slice(-6);
-  return `https://image.pollinations.ai/prompt/${encodedPrompt}?model=flux&width=${width}&height=${height}&nologo=true&seed=${seed}&enhance=true&quality=high`;
+// Função para obter o nome do tema
+export function getThemeName(themeKey: keyof typeof backgroundThemes): string {
+  return backgroundThemes[themeKey].name;
 }
 
-// Gerar URL da Pollinations.ai (compatibilidade)
+// Gerar URL da Pollinations.ai com base no prompt
 export function generatePollinationsUrl(prompt: string, width: number = 1920, height: number = 1080): string {
   const encodedPrompt = encodeURIComponent(prompt);
   const seed = Date.now().toString().slice(-6);
