@@ -1,7 +1,7 @@
 # 🎬 Videos IA
 
-Gerador de vídeos personalizados com texto, estilos avançados e fundos gerados por Inteligência Artificial.
-
+Gerador de vídeos personalizados com texto, estilos avançados e fundos gerados por Inteligência Artificial. 
+Versão Beta - Funcionando apenas em tempo de projeto
 ---
 
 ## 🚀 O que faz?
