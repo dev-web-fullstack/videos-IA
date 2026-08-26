@@ -19,6 +19,7 @@ export async function POST(req: Request) {
       backgroundColor = "#000000",
       imageUrl,
       overlayImages,
+      audioPath, // NOVO
     }: {
       script?: string;
       videoDuration: number;
@@ -30,6 +31,7 @@ export async function POST(req: Request) {
       backgroundColor?: string;
       imageUrl?: string;
       overlayImages?: { path: string; position: { x: number; y: number }; size: number; aspectRatio?: number }[];
+      audioPath?: string;
     } = body;
 
     if (!videoDuration || videoDuration < 1) {
@@ -56,6 +58,7 @@ export async function POST(req: Request) {
     if (overlayImages && overlayImages.length > 0) {
       console.log(`📷 Overlays: ${overlayImages.length} imagem(ns)`);
     }
+    if (audioPath) console.log("🎵 Áudio:", audioPath);
 
     const videoPath = await generateVideoFromText(
       script || "",
@@ -67,7 +70,8 @@ export async function POST(req: Request) {
       backgroundType,
       backgroundColor,
       imageUrl,
-      overlayImages
+      overlayImages,
+      audioPath
     );
 
     if (!videoPath) {
@@ -79,7 +83,6 @@ export async function POST(req: Request) {
 
     console.log("✅ Vídeo gerado:", videoPath);
 
-    // Limpar pasta tmp após geração bem-sucedida
     try {
       clearTempFolder();
       console.log("🧹 Pasta tmp limpa via API route!");

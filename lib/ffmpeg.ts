@@ -73,7 +73,8 @@ export async function generateVideoFromText(
   backgroundType: string = "solid",
   backgroundColor: string = "#000000",
   imageUrl?: string,
-  overlayImages?: OverlayImage[]
+  overlayImages?: OverlayImage[],
+  audioPath?: string
 ): Promise<string> {
 
   clearAllVideos();
@@ -208,6 +209,7 @@ export async function generateVideoFromText(
   if (overlayImages && overlayImages.length > 0) {
     console.log(`📷 Overlays: ${overlayImages.length} imagem(ns)`);
   }
+  if (audioPath) console.log("🎵 Áudio:", audioPath);
   console.log("📝 Texto:", hasText ? `"${script}"` : "(vazio)");
   console.log("📐 Alinhamento H:", textStyle.align);
   console.log("📐 Posição V:", textStyle.verticalPosition);
@@ -403,6 +405,66 @@ export async function generateVideoFromText(
     return currentVideo;
   }
 
+  async function addAudio(videoPath: string): Promise<string> {
+    // Se não houver áudio, retorna o vídeo original
+    if (!audioPath) {
+      return videoPath;
+    }
+
+    const fullAudioPath = path.join(process.cwd(), "public", audioPath);
+    if (!fs.existsSync(fullAudioPath)) {
+      console.warn("⚠️ Arquivo de áudio não encontrado:", audioPath);
+      return videoPath;
+    }
+
+    const outputVideo = path.join(tempDir, `with-audio-${timestamp}.mp4`);
+
+    const args = [
+      "-y",
+      "-i", videoPath,
+      "-i", fullAudioPath,
+      "-c:v", "copy",
+      "-c:a", "aac",
+      "-map", "0:v:0",
+      "-map", "1:a:0",
+      "-shortest",
+      outputVideo,
+    ];
+
+    console.log("🔧 Adicionando áudio ao vídeo...");
+    console.log("🎵 Áudio:", audioPath);
+
+    return new Promise((resolve, reject) => {
+      const ffmpeg = spawn("ffmpeg", args);
+
+      ffmpeg.stderr.on("data", (data) => {
+        const message = data.toString();
+        if (message.includes("frame=") || message.includes("time=")) {
+          const progress = message.match(/time=(\d+:\d+:\d+\.\d+)/);
+          if (progress) {
+            console.log(`⏳ Áudio: ${progress[1]}`);
+          }
+        }
+        if (message.includes("Error") || message.includes("Invalid")) {
+          console.error("❌ Erro FFmpeg:", message);
+        }
+      });
+
+      ffmpeg.on("close", (code) => {
+        if (code === 0 && fs.existsSync(outputVideo)) {
+          console.log("✅ Áudio adicionado!");
+          resolve(outputVideo);
+        } else {
+          reject(new Error(`Erro ao adicionar áudio (código ${code})`));
+        }
+      });
+
+      ffmpeg.on("error", (error) => {
+        reject(error);
+      });
+    });
+  }
+
   async function addText(videoPath: string): Promise<string> {
     if (!hasText || !drawTextFilter) {
       return videoPath;
@@ -468,16 +530,25 @@ export async function generateVideoFromText(
       }
     }
 
+    // 1. Criar fundo
     let currentVideo = await createBackground();
 
+    // 2. Adicionar overlays (se houver)
     if (overlayImages && overlayImages.length > 0) {
       currentVideo = await addOverlays(currentVideo, overlayImages);
     }
 
+    // 3. Adicionar áudio (se houver)
+    if (audioPath) {
+      currentVideo = await addAudio(currentVideo);
+    }
+
+    // 4. Adicionar texto (se houver)
     if (hasText) {
       currentVideo = await addText(currentVideo);
     }
 
+    // 5. Copiar para o destino final
     if (fs.existsSync(outputPath)) {
       try { fs.unlinkSync(outputPath); } catch (e) { }
     }
@@ -492,7 +563,7 @@ export async function generateVideoFromText(
       }
     } catch (e) { }
 
-    // LIMPAR TODA A PASTA TMP
+    // Limpar TODA a pasta TMP
     try {
       clearTempFolder();
       console.log("🧹 Pasta tmp limpa com sucesso!");

@@ -1,6 +1,6 @@
 # 🎬 Videos IA
 
-Gerador de vídeos personalizados com texto, estilos avançados e fundos gerados por Inteligência Artificial.
+Gerador de vídeos personalizados com texto, imagem, áudio e background gerado por IA.
 
 ---
 
@@ -13,6 +13,7 @@ Gerador de vídeos personalizados com texto, estilos avançados e fundos gerados
 - Posiciona verticalmente (cima, centro, baixo)
 - Preview em tempo real
 - Download do vídeo com exclusão automática do servidor
+- Adicionar audio wav e mp3
 
 ---
 
