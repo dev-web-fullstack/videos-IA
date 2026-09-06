@@ -87,6 +87,10 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  // REFERÊNCIA PARA CONTROLAR O PREVIEW DO ÁUDIO
+  const audioPreviewRef = useRef<{ pausePreview: () => boolean } | null>(null);
+  const [isAudioPreviewPlaying, setIsAudioPreviewPlaying] = useState(false);
+
   // REFERÊNCIA DO ÁUDIO
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isCleaningRef = useRef(false);
@@ -98,6 +102,28 @@ export default function Home() {
   const [textStyle, setTextStyle] = useState<TextStyle>(
     createDefaultTextStyle({ width: 1920, height: 1080 })
   );
+
+  // Função para pausar o preview do áudio (chamada pelo pai)
+  const pauseAudioPreview = () => {
+    if (audioPreviewRef.current) {
+      const paused = audioPreviewRef.current.pausePreview();
+      if (paused) {
+        console.log('🎵 Preview pausado por ação externa');
+      }
+    }
+    // Também pausar o áudio principal se estiver tocando
+    if (audioRef.current && isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    }
+  };
+
+  // PAUSAR PREVIEW QUANDO MUDAR DE ABA
+  const handleTabChange = (tab: Tab) => {
+    // Pausar preview se estiver tocando
+    pauseAudioPreview();
+    setActiveTab(tab);
+  };
 
   useEffect(() => {
     return () => {
@@ -134,12 +160,10 @@ export default function Home() {
   }, [width, height]);
 
   // ============================================
-  // GERENCIAMENTO DO ÁUDIO - CENTRALIZADO
+  // GERENCIAMENTO DO ÁUDIO
   // ============================================
 
-  // Carregar áudio quando o path mudar
   useEffect(() => {
-    // Limpar áudio anterior
     if (audioRef.current) {
       isCleaningRef.current = true;
       audioRef.current.pause();
@@ -211,7 +235,6 @@ export default function Home() {
 
   }, [audioFile?.path]);
 
-  // Controlar play/pause
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !isAudioLoaded || isCleaningRef.current) return;
@@ -226,7 +249,6 @@ export default function Home() {
     }
   }, [isPlaying, isAudioLoaded]);
 
-  // Sincronizar tempo
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !isAudioLoaded || isCleaningRef.current) return;
@@ -240,6 +262,7 @@ export default function Home() {
 
   const handleAudioRemove = () => {
     console.log('📢 page: Removendo áudio');
+    pauseAudioPreview();
     isCleaningRef.current = true;
     if (audioRef.current) {
       audioRef.current.pause();
@@ -274,6 +297,9 @@ export default function Home() {
   // ============================================
 
   async function handleGenerateVideo() {
+    // PAUSAR PREVIEW DE ÁUDIO AO GERAR VÍDEO
+    pauseAudioPreview();
+
     if (backgroundType === "ai-generated" && !backgroundImage) {
       alert("Por favor, gere uma imagem de fundo com IA primeiro!");
       return;
@@ -398,10 +424,12 @@ export default function Home() {
     }
   };
 
-  // Verificar se algo está bloqueando a interface
+  // ============================================
+  // ESTADO DE BLOQUEIO - INCLUI DOWNLOAD
+  // ============================================
+
   const isBlocked = isGenerating || isDownloading || isGeneratingImage;
 
-  // CORRIGIDO: hasText agora é boolean
   const hasText = script && script.trim().length > 0 ? true : false;
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
@@ -459,6 +487,11 @@ export default function Home() {
                 <Loader2 className="w-3 h-3 animate-spin" /> Gerando vídeo...
               </span>
             )}
+            {isDownloading && (
+              <span className="text-xs text-blue-400 animate-pulse flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> Baixando vídeo...
+              </span>
+            )}
             {isPlaying && (
               <span className="text-xs text-green-400 animate-pulse flex items-center gap-1">
                 ▶️ Reproduzindo
@@ -478,7 +511,7 @@ export default function Home() {
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => !isBlocked && setActiveTab(tab.id)}
+                    onClick={() => !isBlocked && handleTabChange(tab.id)}
                     disabled={isBlocked}
                     className={`
                       flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-xs font-medium transition-all duration-300
@@ -496,7 +529,7 @@ export default function Home() {
               })}
             </div>
 
-            {/* Conteúdo das Tabs - DESABILITADO QUANDO isBlocked */}
+            {/* Conteúdo das Tabs */}
             <div className={`bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4 min-h-[350px] max-h-[500px] overflow-y-auto transition-all duration-300 ${isBlocked ? 'opacity-60 pointer-events-none' : ''}`}>
               {activeTab === "text" && (
                 <div className="space-y-4">
@@ -589,6 +622,7 @@ export default function Home() {
                   </div>
                   <AudioUploader
                     key={audioFile?.path || 'no-audio'}
+                    ref={audioPreviewRef}
                     onAudioChange={setAudioFile}
                     audioFile={audioFile}
                     onRemove={handleAudioRemove}
@@ -596,6 +630,7 @@ export default function Home() {
                     setIsGenerating={setIsGeneratingAudio}
                     disabled={isBlocked}
                     videoDuration={displayDuration}
+                    onPreviewStateChange={setIsAudioPreviewPlaying}
                   />
                   {isAudioLoaded && audioDuration > 0 && (
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-pink-500/10 border border-pink-500/20 text-xs">
@@ -623,7 +658,7 @@ export default function Home() {
               />
             </div>
 
-            {/* Botão Gerar */}
+            {/* Botão Gerar - DESABILITADO QUANDO isBlocked */}
             <GenerateButton
               onClick={handleGenerateVideo}
               disabled={
@@ -648,7 +683,7 @@ export default function Home() {
               </div>
             )}
 
-            {!hasText && !isGenerating && !isGeneratingImage && (
+            {!hasText && !isGenerating && !isGeneratingImage && !isDownloading && (
               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-900/30 border border-blue-700/50 text-blue-400 text-xs">
                 <Info className="w-4 h-4" /> O vídeo será gerado sem texto
               </div>
@@ -701,7 +736,7 @@ export default function Home() {
               onDelete={() => setVideoResult(null)}
             />
 
-            {!videoResult && !isGenerating && (
+            {!videoResult && !isGenerating && !isDownloading && (
               <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/5 p-8 min-h-[150px]">
                 <Video className="w-12 h-12 text-gray-600 mb-3" />
                 <span className="text-gray-500 text-sm text-center">Gere um vídeo para visualizar o resultado</span>
