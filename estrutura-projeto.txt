@@ -1,0 +1,115 @@
+========================================
+📁 ESTRUTURA DO PROJETO
+📅 06/09/2026, 17:54:09
+========================================
+
+├── 📁 app/
+│   ├── 📁 api/
+│   │   ├── 📁 delete-audio/
+│   │   │   └── 📘 route.ts (2.0KB)
+│   │   ├── 📁 delete-image/
+│   │   │   └── 📘 route.ts (1.1KB)
+│   │   ├── 📁 delete-video/
+│   │   │   └── 📘 route.ts (2.1KB)
+│   │   ├── 📁 download-video/
+│   │   │   └── 📘 route.ts (3.0KB)
+│   │   ├── 📁 freesound-download/
+│   │   │   └── 📘 route.ts (3.4KB)
+│   │   ├── 📁 freesound-preview/
+│   │   │   └── 📘 route.ts (3.6KB)
+│   │   ├── 📁 freesound-search/
+│   │   │   └── 📘 route.ts (3.5KB)
+│   │   ├── 📁 generate-video/
+│   │   │   └── 📘 route.ts (2.9KB)
+│   │   ├── 📁 get-audios/
+│   │   │   └── 📘 route.ts (1.9KB)
+│   │   ├── 📁 get-images/
+│   │   │   └── 📘 route.ts (1.1KB)
+│   │   ├── 📁 upload-audio/
+│   │   │   └── 📘 route.ts (2.6KB)
+│   │   └── 📁 upload-image/
+│   │       └── 📘 route.ts (2.1KB)
+│   ├── 🖼️ favicon.ico (25.3KB)
+│   ├── 🎨 globals.css (0.5KB)
+│   ├── ⚛️ layout.tsx (0.8KB)
+│   └── ⚛️ page.tsx (28.3KB)
+├── 📁 components/
+│   ├── 📁 form/
+│   │   ├── ⚛️ AudioUploader.tsx (26.9KB)
+│   │   ├── ⚛️ BackgroundSelector.tsx (12.6KB)
+│   │   ├── ⚛️ CustomSizeInput.tsx (2.7KB)
+│   │   ├── ⚛️ DurationInput.tsx (1.6KB)
+│   │   ├── ⚛️ GenerateButton.tsx (0.8KB)
+│   │   ├── ⚛️ ImageUploader.tsx (9.5KB)
+│   │   ├── ⚛️ ScriptInput.tsx (0.8KB)
+│   │   ├── ⚛️ TextStyleEditor.tsx (10.9KB)
+│   │   ├── ⚛️ VideoFormatSelect.tsx (9.1KB)
+│   │   ├── ⚛️ VideoPreview.tsx (1.3KB)
+│   │   └── ⚛️ VideoSizeSelector.tsx (1.4KB)
+│   ├── 📁 layout/
+│   │   └── ⚛️ Header.tsx (0.1KB)
+│   ├── 📁 preview/
+│   │   ├── ⚛️ AspectRatioPreview.tsx (1.2KB)
+│   │   ├── ⚛️ AudioTimeline.tsx (12.4KB)
+│   │   ├── ⚛️ FormatPreview.tsx (1.4KB)
+│   │   ├── ⚛️ LiveTextPreview.tsx (24.7KB)
+│   │   ├── ⚛️ ProgressBar.tsx (4.0KB)
+│   │   ├── ⚛️ ResultCard.tsx (4.3KB)
+│   │   └── ⚛️ VideoPlayer.tsx (0.8KB)
+│   └── 📁 ui/
+│       ├── ⚛️ Button.tsx (0.6KB)
+│       ├── ⚛️ Card.tsx (0.2KB)
+│       ├── ⚛️ Input.tsx (0.9KB)
+│       ├── ⚛️ Select.tsx (1.1KB)
+│       └── ⚛️ Textarea.tsx (0.9KB)
+├── 📁 lib/
+│   ├── 📘 backgroundAnimations.ts (9.4KB)
+│   ├── 📘 ffmpeg.ts (17.9KB)
+│   ├── 📘 freesound.ts (5.9KB)
+│   ├── 📘 textFormatter.ts (1.0KB)
+│   ├── 📘 textLayout.ts (5.2KB)
+│   ├── 📘 textStyle.ts (1.5KB)
+│   ├── 📘 utils.ts (12.4KB)
+│   └── 📘 videoConfig.ts (1.9KB)
+├── 📁 public/
+│   ├── 📁 audio/
+│   │   ├── 📄 audio-1788648227407-fciv8n.mp3 (290.4KB)
+│   │   ├── 📄 freesound_A_Busy_Restaurant_At_Rush_Hour_1788652457100_6lkak8.mp3 (3924.6KB)
+│   │   ├── 📄 freesound_Ambient_Flute_Based_Texture_1788649349281_3z3dm9.mp3 (1985.8KB)
+│   │   ├── 📄 freesound_Ambient_Flute_Based_Texture_1788652062177_m9iltv.mp3 (1985.8KB)
+│   │   ├── 📄 freesound_Ambient_Flute_Based_Texture_1788652779170_dle5pm.mp3 (1985.8KB)
+│   │   ├── 📄 freesound_Ambient_Flute_Based_Texture_1788654490501_tj47x4.mp3 (1985.8KB)
+│   │   ├── 📄 freesound_Ambient_Flute_Based_Texture_1788727825099_di9gos.mp3 (1985.8KB)
+│   │   ├── 📄 freesound_Lola_Moore___Tranquil_Ethereal_1788654121714_wo8enx.mp3 (3358.3KB)
+│   │   ├── 📄 freesound_Rain_coming_down_from_roof_wav_1788654601140_fl0dud.mp3 (1089.3KB)
+│   │   ├── 📄 freesound_STACC_CHOIR_IN_C_wav_1788654232709_95q834.mp3 (220.1KB)
+│   │   ├── 📄 freesound_Steady_Rainstorm_1788713001589_f85xdk.mp3 (709.6KB)
+│   │   ├── 📄 freesound_Wooden_Windchimes___Terra_Firm_1788653331080_xndfkm.mp3 (3213.0KB)
+│   │   ├── 📄 pixabay_M_sica_sem_t_tulo_1788302352657_smx09n.mp3 (1.3KB)
+│   │   └── 📄 pixabay_M_sica_sem_t_tulo_1788303295245_63th5u.mp3 (1.2KB)
+│   ├── 📁 fonts/
+│   │   ├── 🎨 fonts.css (1.8KB)
+│   │   ├── 🔤 Inter-Regular.ttf (334.6KB)
+│   │   ├── 🔤 Lato-Regular.ttf (73.4KB)
+│   │   ├── 🔤 Montserrat-Regular.ttf (323.2KB)
+│   │   ├── 🔤 Nunito-Regular.ttf (129.1KB)
+│   │   ├── 🔤 OpenSans-Regular.ttf (127.8KB)
+│   │   ├── 🔤 Oswald-Regular.ttf (85.2KB)
+│   │   ├── 🔤 Poppins-Regular.ttf (154.5KB)
+│   │   ├── 🔤 Quicksand-Regular.ttf (77.1KB)
+│   │   ├── 🔤 Raleway-Regular.ttf (160.0KB)
+│   │   └── 🔤 Roboto-Regular.ttf (155.4KB)
+│   └── 📁 videos/
+│       └── 🎬 video-1788653359497-s2rpso0t.mp4 (2646.4KB)
+├── 📄 .env.local (0.1KB)
+├── 🔒 .gitignore (0.5KB)
+├── 📄 eslint.config.mjs (0.5KB)
+├── 📄 estrutura-projeto.txt (5.7KB)
+├── 📜 generate-structure.js (6.0KB)
+├── 📘 next-env.d.ts (0.3KB)
+├── 📘 next.config.ts (0.1KB)
+├── 📋 package-lock.json (241.0KB)
+├── 📋 package.json (0.7KB)
+├── 📄 postcss.config.mjs (0.1KB)
+├── 📝 README.md (1.0KB)
+└── 📋 tsconfig.json (0.7KB)

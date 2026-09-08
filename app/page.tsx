@@ -14,7 +14,8 @@ import {
   Clock,
   Images,
   Music,
-  Info
+  Info,
+  Mic,
 } from "lucide-react";
 
 import Header from "../components/layout/Header";
@@ -28,6 +29,7 @@ import TextStyleEditor from "../components/form/TextStyleEditor";
 import BackgroundSelector from "../components/form/BackgroundSelector";
 import ImageUploader from "../components/form/ImageUploader";
 import AudioUploader from "../components/form/AudioUploader";
+import TTSGenerator from "../components/form/TTSGenerator";
 
 import ProgressBar from "../components/preview/ProgressBar";
 import ResultCard from "../components/preview/ResultCard";
@@ -40,7 +42,7 @@ import {
 
 import { BackgroundType } from "../lib/backgroundAnimations";
 
-type Tab = "text" | "background" | "images" | "audio";
+type Tab = "text" | "tts" | "background" | "images" | "audio";
 
 interface OverlayImage {
   path: string;
@@ -295,6 +297,41 @@ export default function Home() {
   };
 
   // ============================================
+  // HANDLE TTS AUDIO GENERATED
+  // ============================================
+
+  const handleTTSAudioGenerated = (audioPath: string, filename: string, duration?: number) => {
+    console.log('🎤 Áudio TTS gerado:', audioPath, 'Duração:', duration);
+
+    // Criar um objeto AudioFile a partir do TTS gerado
+    const newAudioFile: AudioFile = {
+      name: filename || `tts_${Date.now()}.mp3`,
+      path: audioPath,
+      size: 0, // Será atualizado quando carregar
+    };
+
+    // Remover áudio anterior se existir
+    if (audioFile) {
+      handleAudioRemove();
+    }
+
+    // Definir o novo áudio
+    setAudioFile(newAudioFile);
+
+    // Se tiver duração, atualizar
+    if (duration && duration > 0) {
+      setAudioDuration(duration);
+      setVideoDuration(Math.ceil(duration));
+    }
+
+    // Forçar recarregar o preview
+    setPreviewKey(prev => prev + 1);
+
+    // Opcional: Mudar para a aba de áudio para mostrar o resultado
+    // setActiveTab('audio');
+  };
+
+  // ============================================
 
   async function handleGenerateVideo() {
     // PAUSAR PREVIEW DE ÁUDIO AO GERAR VÍDEO
@@ -434,6 +471,7 @@ export default function Home() {
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
     { id: "text", label: "Texto", icon: FileText },
+    { id: "tts", label: "Gerar Voz", icon: Mic },
     { id: "background", label: "Fundo", icon: Image },
     { id: "images", label: "Imagens", icon: Images },
     { id: "audio", label: "Áudio", icon: Music },
@@ -563,6 +601,22 @@ export default function Home() {
                       <span className="text-yellow-400 text-[10px]"> (sem texto)</span>
                     )}
                   </div>
+                </div>
+              )}
+
+              {activeTab === "tts" && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Mic className="w-5 h-5 text-purple-400" />
+                    <h3 className="text-white font-semibold">Gerar Voz</h3>
+                    <span className="text-[10px] text-purple-400/60 bg-purple-500/10 px-2 py-0.5 rounded-full ml-auto">
+                      Fish Audio S2.1 Pro
+                    </span>
+                  </div>
+                  <TTSGenerator
+                    onAudioGenerated={handleTTSAudioGenerated}
+                    disabled={isBlocked}
+                  />
                 </div>
               )}
 
