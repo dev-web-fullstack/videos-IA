@@ -23,7 +23,7 @@ import Card from "../components/ui/Card";
 
 import ScriptInput from "../components/form/ScriptInput";
 import DurationInput from "../components/form/DurationInput";
-import VideoSizeSelector from "../components/form/VideoSizeSelector";
+import VideoSizeBar from "../components/form/VideoSizeBar";
 import GenerateButton from "../components/form/GenerateButton";
 import TextStyleEditor from "../components/form/TextStyleEditor";
 import BackgroundSelector from "../components/form/BackgroundSelector";
@@ -89,11 +89,9 @@ export default function Home() {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  // REFERÊNCIA PARA CONTROLAR O PREVIEW DO ÁUDIO
   const audioPreviewRef = useRef<{ pausePreview: () => boolean } | null>(null);
   const [isAudioPreviewPlaying, setIsAudioPreviewPlaying] = useState(false);
 
-  // REFERÊNCIA DO ÁUDIO
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isCleaningRef = useRef(false);
 
@@ -105,7 +103,6 @@ export default function Home() {
     createDefaultTextStyle({ width: 1920, height: 1080 })
   );
 
-  // Função para pausar o preview do áudio (chamada pelo pai)
   const pauseAudioPreview = () => {
     if (audioPreviewRef.current) {
       const paused = audioPreviewRef.current.pausePreview();
@@ -113,16 +110,13 @@ export default function Home() {
         console.log('🎵 Preview pausado por ação externa');
       }
     }
-    // Também pausar o áudio principal se estiver tocando
     if (audioRef.current && isPlaying) {
       audioRef.current.pause();
       setIsPlaying(false);
     }
   };
 
-  // PAUSAR PREVIEW QUANDO MUDAR DE ABA
   const handleTabChange = (tab: Tab) => {
-    // Pausar preview se estiver tocando
     pauseAudioPreview();
     setActiveTab(tab);
   };
@@ -160,10 +154,6 @@ export default function Home() {
       lineSpacing: defaults.lineSpacing,
     }));
   }, [width, height]);
-
-  // ============================================
-  // GERENCIAMENTO DO ÁUDIO
-  // ============================================
 
   useEffect(() => {
     if (audioRef.current) {
@@ -260,8 +250,6 @@ export default function Home() {
     }
   }, [currentTime, isAudioLoaded]);
 
-  // ============================================
-
   const handleAudioRemove = () => {
     console.log('📢 page: Removendo áudio');
     pauseAudioPreview();
@@ -296,45 +284,37 @@ export default function Home() {
     }
   };
 
-  // ============================================
-  // HANDLE TTS AUDIO GENERATED
-  // ============================================
-
   const handleTTSAudioGenerated = (audioPath: string, filename: string, duration?: number) => {
-    console.log('🎤 Áudio TTS gerado:', audioPath, 'Duração:', duration);
+    console.log('🎤 Áudio TTS selecionado:', audioPath);
 
-    // Criar um objeto AudioFile a partir do TTS gerado
     const newAudioFile: AudioFile = {
       name: filename || `tts_${Date.now()}.mp3`,
       path: audioPath,
-      size: 0, // Será atualizado quando carregar
+      size: 0,
     };
 
-    // Remover áudio anterior se existir
     if (audioFile) {
       handleAudioRemove();
     }
 
-    // Definir o novo áudio
     setAudioFile(newAudioFile);
 
-    // Se tiver duração, atualizar
     if (duration && duration > 0) {
       setAudioDuration(duration);
       setVideoDuration(Math.ceil(duration));
     }
 
-    // Forçar recarregar o preview
     setPreviewKey(prev => prev + 1);
-
-    // Opcional: Mudar para a aba de áudio para mostrar o resultado
-    // setActiveTab('audio');
   };
 
-  // ============================================
+  const handleTTSAudioRemove = (audioPath: string) => {
+    console.log('🗑️ Áudio TTS removido:', audioPath);
+    if (audioFile?.path === audioPath) {
+      handleAudioRemove();
+    }
+  };
 
   async function handleGenerateVideo() {
-    // PAUSAR PREVIEW DE ÁUDIO AO GERAR VÍDEO
     pauseAudioPreview();
 
     if (backgroundType === "ai-generated" && !backgroundImage) {
@@ -461,12 +441,7 @@ export default function Home() {
     }
   };
 
-  // ============================================
-  // ESTADO DE BLOQUEIO - INCLUI DOWNLOAD
-  // ============================================
-
   const isBlocked = isGenerating || isDownloading || isGeneratingImage;
-
   const hasText = script && script.trim().length > 0 ? true : false;
 
   const tabs: { id: Tab; label: string; icon: any }[] = [
@@ -488,60 +463,68 @@ export default function Home() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
-              <Monitor className="w-4 h-4 text-blue-400" />
-              <span className="text-sm text-gray-300 font-mono">{width} × {height}</span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
-              <Clock className="w-4 h-4 text-green-400" />
-              <span className="text-sm text-gray-300">{displayDuration}s</span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
-              <DurationInput
-                key={`duration-${previewKey}`}
-                value={videoDuration}
-                onChange={(v) => {
-                  setVideoDuration(v);
-                  setPreviewKey(prev => prev + 1);
-                }}
-                disabled={isBlocked || (isAudioLoaded && audioDuration > 0)}
-                compact={true}
-              />
-              {isAudioLoaded && audioDuration > 0 && (
-                <span className="text-[10px] text-pink-400">🔒</span>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {isGeneratingImage && (
-              <span className="text-xs text-purple-400 animate-pulse flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" /> Gerando imagem...
-              </span>
-            )}
-            {isGenerating && (
-              <span className="text-xs text-yellow-400 animate-pulse flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" /> Gerando vídeo...
-              </span>
-            )}
-            {isDownloading && (
-              <span className="text-xs text-blue-400 animate-pulse flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" /> Baixando vídeo...
-              </span>
-            )}
-            {isPlaying && (
-              <span className="text-xs text-green-400 animate-pulse flex items-center gap-1">
-                ▶️ Reproduzindo
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-[340px_1fr] gap-6">
-          {/* Sidebar - Controles */}
+        <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6">
+          {/* Sidebar - Controles - SEM ALTURA MÁXIMA E SEM SCROLL */}
           <div className="space-y-4">
-            {/* Tabs Navigation - DESABILITADO QUANDO isBlocked */}
+            {/* Informações de Vídeo - Resolução, Duração, Plataforma */}
+            <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                  <Monitor className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="text-xs text-gray-300 font-mono">{width} × {height}</span>
+                </div>
+                <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                  <Clock className="w-3.5 h-3.5 text-green-400" />
+                  <span className="text-xs text-gray-300">{displayDuration}s</span>
+                </div>
+                <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                  <DurationInput
+                    key={`duration-${previewKey}`}
+                    value={videoDuration}
+                    onChange={(v) => {
+                      setVideoDuration(v);
+                      setPreviewKey(prev => prev + 1);
+                    }}
+                    disabled={isBlocked || (isAudioLoaded && audioDuration > 0)}
+                    compact={true}
+                  />
+                  {isAudioLoaded && audioDuration > 0 && (
+                    <span className="text-[10px] text-pink-400">🔒</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Barra de Resolução/Plataforma - Accordion */}
+              <div className="mt-3 pt-3 border-t border-white/5">
+                <VideoSizeBar
+                  width={width}
+                  height={height}
+                  platform={platform}
+                  onChange={(newPlatform, newWidth, newHeight) => {
+                    setPlatform(newPlatform);
+                    setWidth(newWidth);
+                    setHeight(newHeight);
+                    const defaults = createDefaultTextStyle({ width: newWidth, height: newHeight });
+                    setTextStyle(prev => ({
+                      ...prev,
+                      fontSize: defaults.fontSize,
+                      marginX: defaults.marginX,
+                      marginY: defaults.marginY,
+                      padding: defaults.padding,
+                      borderRadius: defaults.borderRadius,
+                      borderWidth: defaults.borderWidth,
+                      shadowX: defaults.shadowX,
+                      shadowY: defaults.shadowY,
+                      shadowBlur: defaults.shadowBlur,
+                      lineSpacing: defaults.lineSpacing,
+                    }));
+                  }}
+                  disabled={isBlocked}
+                />
+              </div>
+            </div>
+
+            {/* Tabs Navigation */}
             <div className="flex rounded-xl bg-white/5 border border-white/10 p-1">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
@@ -560,15 +543,15 @@ export default function Home() {
                       ${isBlocked ? "opacity-50 cursor-not-allowed" : ""}
                     `}
                   >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span className="hidden sm:inline">{tab.label}</span>
+                    <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="hidden sm:inline whitespace-nowrap">{tab.label}</span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Conteúdo das Tabs */}
-            <div className={`bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4 min-h-[350px] max-h-[500px] overflow-y-auto transition-all duration-300 ${isBlocked ? 'opacity-60 pointer-events-none' : ''}`}>
+            {/* Conteúdo das Tabs - SEM ALTURA MÁXIMA E SEM SCROLL */}
+            <div className={`bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4 transition-all duration-300 ${isBlocked ? 'opacity-60 pointer-events-none' : ''}`}>
               {activeTab === "text" && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -615,7 +598,9 @@ export default function Home() {
                   </div>
                   <TTSGenerator
                     onAudioGenerated={handleTTSAudioGenerated}
+                    onAudioRemove={handleTTSAudioRemove}
                     disabled={isBlocked}
+                    selectedAudioPath={audioFile?.path || null}
                   />
                 </div>
               )}
@@ -699,32 +684,7 @@ export default function Home() {
               )}
             </div>
 
-            {/* Video Size Selector - DESABILITADO QUANDO isBlocked */}
-            <div className={`bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-3 ${isBlocked ? 'opacity-60 pointer-events-none' : ''}`}>
-              <VideoSizeSelector
-                platform={platform}
-                setPlatform={setPlatform}
-                width={width}
-                height={height}
-                setWidth={setWidth}
-                setHeight={setHeight}
-                disabled={isBlocked}
-              />
-            </div>
-
-            {/* Botão Gerar - DESABILITADO QUANDO isBlocked */}
-            <GenerateButton
-              onClick={handleGenerateVideo}
-              disabled={
-                isGeneratingImage ||
-                isGenerating ||
-                isDownloading ||
-                (backgroundType === "ai-generated" && !backgroundImage)
-              }
-              isGenerating={isGenerating}
-              label="🎬 Gerar Vídeo"
-            />
-
+            {/* AVISOS - Fundo IA */}
             {backgroundType === "ai-generated" && !backgroundImage && !isGeneratingImage && (
               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-900/30 border border-yellow-700/50 text-yellow-400 text-xs">
                 <Shield className="w-4 h-4" /> Gere uma imagem de fundo com IA primeiro!
@@ -736,16 +696,11 @@ export default function Home() {
                 <Loader2 className="w-4 h-4 animate-spin" /> Carregando imagem... Aguarde!
               </div>
             )}
-
-            {!hasText && !isGenerating && !isGeneratingImage && !isDownloading && (
-              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-900/30 border border-blue-700/50 text-blue-400 text-xs">
-                <Info className="w-4 h-4" /> O vídeo será gerado sem texto
-              </div>
-            )}
           </div>
 
-          {/* Preview - ÁREA PRINCIPAL */}
+          {/* ÁREA PRINCIPAL - Preview + Botão Gerar + Resultados */}
           <div className="space-y-4">
+            {/* Preview do Vídeo */}
             <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4">
               <LiveTextPreview
                 key={`preview-${previewKey}`}
@@ -777,12 +732,27 @@ export default function Home() {
               />
             </div>
 
+            {/* Botão Gerar Vídeo - ENTRE O PREVIEW E OS RESULTADOS */}
+            <GenerateButton
+              onClick={handleGenerateVideo}
+              disabled={
+                isGeneratingImage ||
+                isGenerating ||
+                isDownloading ||
+                (backgroundType === "ai-generated" && !backgroundImage)
+              }
+              isGenerating={isGenerating}
+              label="🎬 Gerar Vídeo"
+            />
+
+            {/* Barra de Progresso (quando gerando) */}
             {isGenerating && (
               <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4">
                 <ProgressBar duration={displayDuration} hasAnimation={false} />
               </div>
             )}
 
+            {/* Resultado do Vídeo */}
             <ResultCard
               result={videoResult}
               onDownload={handleDownloadVideo}
@@ -790,10 +760,13 @@ export default function Home() {
               onDelete={() => setVideoResult(null)}
             />
 
+            {/* Placeholder quando não há resultado */}
             {!videoResult && !isGenerating && !isDownloading && (
-              <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/5 p-8 min-h-[150px]">
-                <Video className="w-12 h-12 text-gray-600 mb-3" />
-                <span className="text-gray-500 text-sm text-center">Gere um vídeo para visualizar o resultado</span>
+              <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/5 p-8 min-h-[100px]">
+                <Video className="w-10 h-10 text-gray-600 mb-2" />
+                <span className="text-gray-500 text-sm text-center">
+                  Gere um vídeo para visualizar o resultado
+                </span>
               </div>
             )}
           </div>
