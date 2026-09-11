@@ -22,7 +22,7 @@ export default function DurationInput({
   if (compact) {
     return (
       <div className="flex items-center gap-1">
-        <Input
+        <input
           id={id}
           name={name}
           type="number"
@@ -33,9 +33,15 @@ export default function DurationInput({
           onChange={(e) => onChange(Number(e.target.value))}
           placeholder="5"
           disabled={disabled}
-          className="w-16 h-7 text-sm p-1 bg-gray-800/50 border-gray-600"
+          className={`
+            w-16 h-7 text-sm p-1 rounded-md border text-center
+            ${disabled
+              ? "bg-gray-700/50 border-gray-600 text-gray-400 cursor-not-allowed"
+              : "bg-gray-800/80 border-gray-500 text-white focus:border-purple-500 focus:outline-none"
+            }
+          `}
         />
-        <span className="text-xs text-gray-400">s</span>
+        <span className={`text-xs ${disabled ? 'text-gray-500' : 'text-gray-300'}`}>s</span>
       </div>
     );
   }

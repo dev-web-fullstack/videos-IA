@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import type { TextStyle } from "../../lib/textStyle";
 import { buildTextLayout } from "../../lib/textLayout";
 import { BackgroundType } from "../../lib/backgroundAnimations";
-import { Play, Pause, Volume2, VolumeX, Music } from "lucide-react";
+import { Play, Pause, Volume2, VolumeX } from "lucide-react";
 
 interface ImageOverlay {
   path: string;
@@ -89,7 +89,6 @@ export default function LiveTextPreview({
   const hasTextContent = displayText && displayText.trim().length > 0;
   const hasAudio = audioPath && audioPath.trim().length > 0;
 
-  // Atualizar duração quando receber do parent
   useEffect(() => {
     if (onDurationChange && videoDuration > 0) {
       setAudioDuration(videoDuration);
@@ -116,16 +115,13 @@ export default function LiveTextPreview({
     };
   }, []);
 
+  // CORREÇÃO: Arredondar para baixo (floor) para não adicionar 1 segundo
   const formatTime = (seconds: number) => {
     if (!seconds || isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '0:00';
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
-
-  // ============================================
-  // RENDERIZAÇÃO
-  // ============================================
 
   const scale = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
   const previewWidth = width * scale;
@@ -173,7 +169,6 @@ export default function LiveTextPreview({
   const isImageBackground = backgroundType === "ai-generated" && backgroundImage;
   const hasOverlays = overlayImages.length > 0;
 
-  // Carregar imagem de fundo
   useEffect(() => {
     setImageDisplayed(false);
     isImageLoadedRef.current = false;
@@ -267,7 +262,6 @@ export default function LiveTextPreview({
     }
   }, [isGeneratingImage, isImageBackground, backgroundImage]);
 
-  // DRAG E RESIZE DAS IMAGENS
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>, index: number) => {
     e.preventDefault();
     e.stopPropagation();
@@ -352,20 +346,8 @@ export default function LiveTextPreview({
   return (
     <section className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-white flex items-center gap-2 flex-wrap">
-          <span>Prévia do vídeo</span>
-          {hasOverlays && <span className="text-xs text-gray-400">({overlayImages.length} imagem(ns))</span>}
-          {hasAudio && audioDuration > 0 && (
-            <span className="text-xs text-pink-400 flex items-center gap-1">
-              <Music className="w-3 h-3" />
-              {formatTime(audioDuration)}
-            </span>
-          )}
-          {disabled && (
-            <span className="text-xs text-yellow-400 animate-pulse flex items-center gap-1">
-              ⏳ Processando...
-            </span>
-          )}
+        <h2 className="text-lg font-semibold text-white">
+          Prévia do vídeo
         </h2>
       </div>
 
@@ -541,7 +523,7 @@ export default function LiveTextPreview({
         </div>
       </div>
 
-      {/* PLAYER DO VÍDEO - DESABILITADO QUANDO disabled */}
+      {/* PLAYER DO VÍDEO */}
       {!isGeneratingImage && (
         <div className="flex justify-center">
           <div className={`flex items-center gap-3 bg-black/80 backdrop-blur-sm rounded-full px-4 py-2 border border-white/10 shadow-xl w-full max-w-[90%] min-w-[280px] ${disabled ? 'opacity-50' : ''}`}>
@@ -549,8 +531,8 @@ export default function LiveTextPreview({
               onClick={onPlayToggle}
               disabled={!playerEnabled || disabled}
               className={`p-1.5 rounded-full transition-all ${!playerEnabled || disabled
-                  ? 'text-gray-500 cursor-not-allowed'
-                  : 'text-white hover:text-purple-400 hover:bg-white/10'
+                ? 'text-gray-500 cursor-not-allowed'
+                : 'text-white hover:text-purple-400 hover:bg-white/10'
                 }`}
               title={!playerEnabled ? "Nenhum áudio" : disabled ? "Processando..." : isPlaying ? "Pausar" : "Reproduzir"}
             >
@@ -590,8 +572,8 @@ export default function LiveTextPreview({
                 onClick={() => setIsMuted(!isMuted)}
                 disabled={!playerEnabled || disabled}
                 className={`p-1 rounded-full ${!playerEnabled || disabled
-                    ? 'text-gray-600 cursor-not-allowed'
-                    : 'text-white/60 hover:text-white hover:bg-white/10'
+                  ? 'text-gray-600 cursor-not-allowed'
+                  : 'text-white/60 hover:text-white hover:bg-white/10'
                   }`}
               >
                 {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
@@ -624,8 +606,6 @@ export default function LiveTextPreview({
       <div className="text-center text-xs text-gray-400">
         {width} × {height} | {lines.length} linhas
         {isImageBackground && imageDisplayed && !isGeneratingImage && " | 🎨 Fundo gerado por IA"}
-        {hasOverlays && !isGeneratingImage && ` | 📷 ${overlayImages.length} imagem(ns)`}
-        {hasAudio && audioDuration > 0 && !isGeneratingImage && ` | 🔊 Com áudio (${formatTime(audioDuration)})`}
         {isGeneratingImage && " | ⏳ Gerando imagem..."}
         {style.align === "justify" && " | 📐 Justificado"}
         {style.verticalPosition !== "center" && ` | 📍 ${style.verticalPosition === "top" ? "⬆️ Cima" : "⬇️ Baixo"}`}

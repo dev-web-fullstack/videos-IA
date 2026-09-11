@@ -32,6 +32,9 @@ interface TTSAudioFile {
   text?: string;
 }
 
+const MAX_VISIBLE_ITEMS = 10;
+const ITEM_HEIGHT = 44;
+
 export default function TTSGenerator({
   onAudioGenerated,
   onAudioRemove,
@@ -52,7 +55,6 @@ export default function TTSGenerator({
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Carregar vozes
   useEffect(() => {
     const loadVoices = async () => {
       try {
@@ -61,10 +63,6 @@ export default function TTSGenerator({
 
         if (data.success && data.voices) {
           setVoices(data.voices);
-        }
-
-        if (data.isFallback) {
-          console.warn('⚠️ Usando vozes padrão (fallback)');
         }
       } catch (error) {
         console.error("❌ Erro ao carregar vozes:", error);
@@ -78,12 +76,10 @@ export default function TTSGenerator({
     loadTtsAudios();
   }, []);
 
-  // Atualizar selectedPath quando o pai mudar
   useEffect(() => {
     setSelectedTtsPath(selectedAudioPath);
   }, [selectedAudioPath]);
 
-  // Carregar áudios TTS existentes
   const loadTtsAudios = async () => {
     try {
       const response = await fetch("/api/tts/list");
@@ -98,7 +94,6 @@ export default function TTSGenerator({
     }
   };
 
-  // Limpar áudio quando desmontar
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -136,22 +131,12 @@ export default function TTSGenerator({
       const data = await response.json();
 
       if (data.success) {
-        // Recarregar lista de áudios
         await loadTtsAudios();
-
-        // Selecionar automaticamente o áudio gerado
         setSelectedTtsPath(data.audioPath);
 
-        // Notificar o pai
         if (onAudioGenerated && data.audioPath) {
           onAudioGenerated(data.audioPath, data.filename || '', data.duration);
         }
-
-        // Limpar o texto após gerar
-        setText("");
-
-        // Mostrar feedback
-        setError(null);
       } else {
         setError(data.error || "Erro ao gerar áudio");
         if (data.error?.includes('API key') || data.error?.includes('chave')) {
@@ -170,15 +155,12 @@ export default function TTSGenerator({
     if (disabled) return;
 
     if (selectedTtsPath === audioPath) {
-      // Deselecionar
       setSelectedTtsPath(null);
       if (onAudioRemove) {
         onAudioRemove(audioPath);
       }
     } else {
-      // Selecionar
       setSelectedTtsPath(audioPath);
-      // Notificar o pai sobre o áudio selecionado
       const audio = ttsAudios.find(a => a.path === audioPath);
       if (audio && onAudioGenerated) {
         onAudioGenerated(audio.path, audio.name, audio.duration);
@@ -217,11 +199,35 @@ export default function TTSGenerator({
     }
   };
 
+  const handleClearText = () => {
+    setText("");
+  };
+
   const charCount = text.length;
   const isTextValid = text.trim().length > 0 && charCount <= 5000;
-
-  // Verificar se o áudio atual está selecionado
   const isSelected = (audioPath: string) => selectedTtsPath === audioPath;
+
+  const cleanAudioName = (name: string): string => {
+    let cleaned = name;
+    cleaned = cleaned.replace(/\.(mp3|wav|ogg|m4a)$/i, '');
+    cleaned = cleaned.replace(/^tts_/i, '');
+    cleaned = cleaned.replace(/^\d+_/, '');
+    cleaned = cleaned.replace(/_\d{10,}_[a-z0-9]{6,}$/i, '');
+    cleaned = cleaned.replace(/_\d{10,}$/, '');
+    cleaned = cleaned.replace(/_/g, ' ');
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    return cleaned || name;
+  };
+
+  const formatAudioDuration = (seconds?: number): string => {
+    if (!seconds || seconds <= 0) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const maxHeight = MAX_VISIBLE_ITEMS * ITEM_HEIGHT;
+  const showScroll = ttsAudios.length > MAX_VISIBLE_ITEMS;
 
   return (
     <div className="space-y-4">
@@ -236,13 +242,24 @@ export default function TTSGenerator({
             {charCount}/5000
           </span>
         </div>
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Digite o texto que você quer transformar em voz..."
-          disabled={disabled || isGenerating}
-          className="w-full h-24 rounded-lg bg-gray-800/50 border border-gray-700/50 p-3 text-white text-sm placeholder-gray-500 focus:border-purple-500/50 focus:outline-none resize-none"
-        />
+        <div className="relative">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Digite o texto que você quer transformar em voz..."
+            disabled={disabled || isGenerating}
+            className="w-full h-24 rounded-lg bg-gray-800/50 border border-gray-700/50 p-3 text-white text-sm placeholder-gray-500 focus:border-purple-500/50 focus:outline-none resize-none pr-8"
+          />
+          {text && !isGenerating && (
+            <button
+              onClick={handleClearText}
+              className="absolute top-2 right-2 p-1 rounded-lg text-gray-500 hover:text-white hover:bg-white/10 transition-colors"
+              title="Limpar texto"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Controles de voz */}
@@ -373,9 +390,18 @@ export default function TTSGenerator({
               {selectedTtsPath ? "1 selecionado" : "Nenhum selecionado"}
             </span>
           </div>
-          <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+          <div
+            className="space-y-1 pr-1"
+            style={{
+              maxHeight: showScroll ? `${maxHeight}px` : 'none',
+              overflowY: showScroll ? 'auto' : 'visible',
+            }}
+          >
             {ttsAudios.map((audio) => {
               const selected = isSelected(audio.path);
+              const cleanedName = cleanAudioName(audio.name);
+              const durationFormatted = formatAudioDuration(audio.duration);
+
               return (
                 <div
                   key={audio.path}
@@ -390,14 +416,14 @@ export default function TTSGenerator({
                   onClick={() => !disabled && handleSelectAudio(audio.path)}
                 >
                   <Music className={`w-4 h-4 flex-shrink-0 ${selected ? "text-purple-400" : "text-gray-400"}`} />
-                  <span className="flex-1 text-xs text-gray-300 truncate flex items-center gap-1">
-                    {audio.name.length > 30 ? audio.name.substring(0, 30) + '...' : audio.name}
-                  </span>
-                  {audio.duration && audio.duration > 0 && (
-                    <span className="text-[10px] text-gray-500 flex-shrink-0">
-                      {Math.ceil(audio.duration)}s
+                  {durationFormatted && (
+                    <span className="text-[10px] text-gray-500 flex-shrink-0 font-mono">
+                      {durationFormatted}
                     </span>
                   )}
+                  <span className="flex-1 text-xs text-gray-300 truncate">
+                    {cleanedName.length > 28 ? cleanedName.substring(0, 28) + '...' : cleanedName}
+                  </span>
                   {selected && (
                     <Check className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
                   )}
@@ -423,13 +449,6 @@ export default function TTSGenerator({
             Digite um texto (até 5000 caracteres) e escolha uma voz para gerar áudio.
             Os áudios gerados aparecerão na lista abaixo.
           </p>
-        </div>
-      )}
-
-      {/* Mensagem quando já tem áudios mas texto está vazio */}
-      {!text && !isGenerating && isApiConfigured && ttsAudios.length > 0 && (
-        <div className="text-center text-[10px] text-gray-500">
-          Selecione um áudio da lista ou digite um novo texto para gerar outra voz
         </div>
       )}
     </div>

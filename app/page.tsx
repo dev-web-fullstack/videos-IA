@@ -27,7 +27,7 @@ import VideoSizeBar from "../components/form/VideoSizeBar";
 import GenerateButton from "../components/form/GenerateButton";
 import TextStyleEditor from "../components/form/TextStyleEditor";
 import BackgroundSelector from "../components/form/BackgroundSelector";
-import ImageUploader from "../components/form/ImageUploader";
+import MediaManager from "../components/form/MediaManager";
 import AudioUploader from "../components/form/AudioUploader";
 import TTSGenerator from "../components/form/TTSGenerator";
 
@@ -42,7 +42,7 @@ import {
 
 import { BackgroundType } from "../lib/backgroundAnimations";
 
-type Tab = "text" | "tts" | "background" | "images" | "audio";
+type Tab = "text" | "tts" | "background" | "media" | "audio";
 
 interface OverlayImage {
   path: string;
@@ -448,7 +448,7 @@ export default function Home() {
     { id: "text", label: "Texto", icon: FileText },
     { id: "tts", label: "Gerar Voz", icon: Mic },
     { id: "background", label: "Fundo", icon: Image },
-    { id: "images", label: "Imagens", icon: Images },
+    { id: "media", label: "Mídias", icon: Images },
     { id: "audio", label: "Áudio", icon: Music },
   ];
 
@@ -456,46 +456,50 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+
+      {/* HEADER + NAVBAR SUPERIOR */}
       <div className="border-b border-white/5 bg-black/30 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <Header />
-        </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6">
-          {/* Sidebar - Controles - SEM ALTURA MÁXIMA E SEM SCROLL */}
-          <div className="space-y-4">
-            {/* Informações de Vídeo - Resolução, Duração, Plataforma */}
-            <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
-                  <Monitor className="w-3.5 h-3.5 text-blue-400" />
-                  <span className="text-xs text-gray-300 font-mono">{width} × {height}</span>
-                </div>
-                <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
-                  <Clock className="w-3.5 h-3.5 text-green-400" />
-                  <span className="text-xs text-gray-300">{displayDuration}s</span>
-                </div>
-                <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-white/5 border border-white/10">
-                  <DurationInput
-                    key={`duration-${previewKey}`}
-                    value={videoDuration}
-                    onChange={(v) => {
-                      setVideoDuration(v);
-                      setPreviewKey(prev => prev + 1);
-                    }}
-                    disabled={isBlocked || (isAudioLoaded && audioDuration > 0)}
-                    compact={true}
-                  />
-                  {isAudioLoaded && audioDuration > 0 && (
-                    <span className="text-[10px] text-pink-400">🔒</span>
-                  )}
-                </div>
+          {/* NAVBAR - Todos os elementos na mesma linha */}
+          <div className="pb-3 pt-2 border-t border-white/5">
+            <div className="flex flex-wrap items-center gap-2">
+
+              {/* Resolução atual */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                <Monitor className="w-3.5 h-3.5 text-blue-400" />
+                <span className="text-xs text-gray-300 font-mono">{width} × {height}</span>
               </div>
 
-              {/* Barra de Resolução/Plataforma - Accordion */}
-              <div className="mt-3 pt-3 border-t border-white/5">
+              {/* Duração atual */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                <Clock className="w-3.5 h-3.5 text-green-400" />
+                <span className="text-xs text-gray-300">{displayDuration}s</span>
+              </div>
+
+              {/* Input de duração */}
+              <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                <DurationInput
+                  key={`duration-${previewKey}`}
+                  value={videoDuration}
+                  onChange={(v) => {
+                    setVideoDuration(v);
+                    setPreviewKey(prev => prev + 1);
+                  }}
+                  disabled={isBlocked || (isAudioLoaded && audioDuration > 0)}
+                  compact={true}
+                />
+                {isAudioLoaded && audioDuration > 0 && (
+                  <span className="text-[10px] text-pink-400">🔒</span>
+                )}
+              </div>
+
+              {/* Separador */}
+              <div className="w-px h-6 bg-white/10" />
+
+              {/* Seleção de Plataforma/Resolução */}
+              <div className="flex-1 min-w-[280px]">
                 <VideoSizeBar
                   width={width}
                   height={height}
@@ -522,8 +526,46 @@ export default function Home() {
                   disabled={isBlocked}
                 />
               </div>
-            </div>
 
+              {/* Status */}
+              <div className="flex items-center gap-2 ml-auto">
+                {isGeneratingImage && (
+                  <span className="text-xs text-purple-400 animate-pulse flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Gerando imagem...
+                  </span>
+                )}
+                {isGenerating && (
+                  <span className="text-xs text-yellow-400 animate-pulse flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Gerando vídeo...
+                  </span>
+                )}
+                {isDownloading && (
+                  <span className="text-xs text-blue-400 animate-pulse flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin" /> Baixando...
+                  </span>
+                )}
+                {isPlaying && (
+                  <span className="text-xs text-green-400 animate-pulse flex items-center gap-1">
+                    ▶️ Reproduzindo
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* CONTEÚDO PRINCIPAL */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        {/* 
+          Layout: flex em desktop.
+          A sidebar tem altura natural (determinada pelo conteúdo).
+          A área de preview usa position: sticky para permanecer visível.
+        */}
+        <div className="flex flex-col lg:flex-row lg:items-start gap-6">
+
+          {/* Sidebar - Controles (rola normalmente) */}
+          <div className="w-full lg:w-[420px] lg:flex-shrink-0 space-y-4">
             {/* Tabs Navigation */}
             <div className="flex rounded-xl bg-white/5 border border-white/10 p-1">
               {tabs.map((tab) => {
@@ -550,7 +592,7 @@ export default function Home() {
               })}
             </div>
 
-            {/* Conteúdo das Tabs - SEM ALTURA MÁXIMA E SEM SCROLL */}
+            {/* Conteúdo das Tabs */}
             <div className={`bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4 transition-all duration-300 ${isBlocked ? 'opacity-60 pointer-events-none' : ''}`}>
               {activeTab === "text" && (
                 <div className="space-y-4">
@@ -576,13 +618,6 @@ export default function Home() {
                       disabled={isBlocked}
                       hasText={hasText}
                     />
-                  </div>
-                  <div className="text-xs text-gray-400 mt-2 flex items-center gap-2">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-400" />
-                    {script.trim().length} caracteres
-                    {!hasText && (
-                      <span className="text-yellow-400 text-[10px]"> (sem texto)</span>
-                    )}
                   </div>
                 </div>
               )}
@@ -634,22 +669,17 @@ export default function Home() {
                 </div>
               )}
 
-              {activeTab === "images" && (
+              {activeTab === "media" && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2">
                     <Images className="w-5 h-5 text-blue-400" />
-                    <h3 className="text-white font-semibold">Imagens do Vídeo</h3>
+                    <h3 className="text-white font-semibold">Mídias do Vídeo</h3>
                   </div>
-                  <ImageUploader
+                  <MediaManager
                     onImagesChange={setOverlayImages}
                     selectedImages={overlayImages}
                     disabled={isBlocked}
                   />
-                  {overlayImages.length > 0 && (
-                    <div className="text-xs text-gray-400">
-                      📷 {overlayImages.length} imagem(ns) adicionada(s).
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -671,20 +701,11 @@ export default function Home() {
                     videoDuration={displayDuration}
                     onPreviewStateChange={setIsAudioPreviewPlaying}
                   />
-                  {isAudioLoaded && audioDuration > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-pink-500/10 border border-pink-500/20 text-xs">
-                      <span className="text-pink-400">🎵</span>
-                      <span className="text-gray-300">
-                        Áudio: <span className="text-white font-mono">{Math.ceil(audioDuration)}s</span>
-                      </span>
-                      <span className="text-pink-400">→ Vídeo: {displayDuration}s</span>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
 
-            {/* AVISOS - Fundo IA */}
+            {/* AVISOS */}
             {backgroundType === "ai-generated" && !backgroundImage && !isGeneratingImage && (
               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-900/30 border border-yellow-700/50 text-yellow-400 text-xs">
                 <Shield className="w-4 h-4" /> Gere uma imagem de fundo com IA primeiro!
@@ -698,8 +719,8 @@ export default function Home() {
             )}
           </div>
 
-          {/* ÁREA PRINCIPAL - Preview + Botão Gerar + Resultados */}
-          <div className="space-y-4">
+          {/* Área Principal - Preview STICKY */}
+          <div className="w-full lg:flex-1 lg:sticky lg:top-[140px] lg:self-start space-y-4">
             {/* Preview do Vídeo */}
             <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4">
               <LiveTextPreview
@@ -732,7 +753,7 @@ export default function Home() {
               />
             </div>
 
-            {/* Botão Gerar Vídeo - ENTRE O PREVIEW E OS RESULTADOS */}
+            {/* Botão Gerar Vídeo */}
             <GenerateButton
               onClick={handleGenerateVideo}
               disabled={
@@ -745,7 +766,7 @@ export default function Home() {
               label="🎬 Gerar Vídeo"
             />
 
-            {/* Barra de Progresso (quando gerando) */}
+            {/* Barra de Progresso */}
             {isGenerating && (
               <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4">
                 <ProgressBar duration={displayDuration} hasAnimation={false} />
@@ -760,7 +781,7 @@ export default function Home() {
               onDelete={() => setVideoResult(null)}
             />
 
-            {/* Placeholder quando não há resultado */}
+            {/* Placeholder */}
             {!videoResult && !isGenerating && !isDownloading && (
               <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/10 bg-white/5 p-8 min-h-[100px]">
                 <Video className="w-10 h-10 text-gray-600 mb-2" />

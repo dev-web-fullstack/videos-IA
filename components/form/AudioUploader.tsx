@@ -20,7 +20,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import {
-  searchCategories,
   popularTags,
   formatDuration,
   formatFileSize,
@@ -38,6 +37,7 @@ interface AvailableAudio {
   path: string;
   size: number;
   uploadedAt: Date;
+  duration?: number;
 }
 
 interface AudioUploaderProps {
@@ -51,7 +51,10 @@ interface AudioUploaderProps {
   onPreviewStateChange?: (isPlaying: boolean) => void;
 }
 
-// Usando forwardRef para expor métodos ao pai
+// Número máximo de itens antes de mostrar scroll
+const MAX_VISIBLE_ITEMS = 10;
+const ITEM_HEIGHT = 44; // altura aproximada de cada item em px
+
 const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderProps>(({
   onAudioChange,
   audioFile,
@@ -68,6 +71,7 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
   const [isUploading, setIsUploading] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resultsContainerRef = useRef<HTMLDivElement>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SoundResult[]>([]);
@@ -85,7 +89,6 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
   const [minDuration, setMinDuration] = useState(0);
   const [maxDuration, setMaxDuration] = useState(180);
 
-  // EXPOR MÉTODO pausePreview PARA O PAI
   useImperativeHandle(ref, () => ({
     pausePreview: () => {
       if (isPlaying) {
@@ -95,6 +98,12 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
       return false;
     }
   }));
+
+  const scrollToTop = () => {
+    if (resultsContainerRef.current) {
+      resultsContainerRef.current.scrollTop = 0;
+    }
+  };
 
   const loadAudios = async () => {
     try {
@@ -122,21 +131,18 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
     }
   }, [audioFile]);
 
-  // Notificar o pai sobre o estado de reprodução
   useEffect(() => {
     if (onPreviewStateChange) {
       onPreviewStateChange(isPlaying);
     }
   }, [isPlaying, onPreviewStateChange]);
 
-  // PAUSAR PREVIEW QUANDO O COMPONENTE FOR DESABILITADO
   useEffect(() => {
     if (disabled && isPlaying) {
       stopPreview();
     }
   }, [disabled]);
 
-  // Função para pausar preview
   const stopPreview = () => {
     if (previewAudio) {
       previewAudio.pause();
@@ -149,7 +155,6 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
   };
 
   const selectAudio = (selectedAudio: AvailableAudio) => {
-    // PAUSAR PREVIEW AO SELECIONAR ÁUDIO
     if (isPlaying) {
       stopPreview();
     }
@@ -183,7 +188,6 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
       return;
     }
 
-    // PAUSAR PREVIEW AO FAZER UPLOAD
     if (isPlaying) {
       stopPreview();
     }
@@ -224,7 +228,6 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
   const handleDelete = async (audioPath: string) => {
     if (!confirm("Tem certeza que deseja excluir este áudio?")) return;
 
-    // PAUSAR PREVIEW AO DELETAR
     if (isPlaying) {
       stopPreview();
     }
@@ -259,7 +262,6 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
       return;
     }
 
-    // PAUSAR PREVIEW AO BUSCAR
     if (isPlaying) {
       stopPreview();
     }
@@ -283,6 +285,7 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
         if (data.results.length === 0) {
           setSearchError("Nenhum resultado encontrado. Tente uma busca diferente.");
         }
+        setTimeout(scrollToTop, 50);
       } else {
         setSearchError(data.error || "Erro ao buscar áudios");
         setSearchResults([]);
@@ -297,7 +300,6 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
   };
 
   const downloadFromFreesound = async (sound: SoundResult) => {
-    // PAUSAR PREVIEW AO INICIAR DOWNLOAD
     if (isPlaying) {
       stopPreview();
     }
@@ -346,7 +348,6 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
   };
 
   const handlePreviewSound = (sound: SoundResult) => {
-    // Limpar completamente o áudio anterior
     if (previewAudio) {
       previewAudio.pause();
       previewAudio.src = '';
@@ -354,7 +355,6 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
       setPreviewAudio(null);
     }
 
-    // Se já está tocando o mesmo e está pausado, apenas reproduzir
     if (currentPreviewId === sound.id && !isPlaying) {
       const audio = previewAudio;
       if (audio) {
@@ -366,14 +366,12 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
       }
     }
 
-    // Se já está tocando o mesmo, pausar
     if (currentPreviewId === sound.id && isPlaying) {
       previewAudio?.pause();
       setIsPlaying(false);
       return;
     }
 
-    // Criar URL do preview
     let previewUrl = sound.preview_url;
     if (!previewUrl) {
       previewUrl = `/api/freesound-preview?id=${sound.id}&quality=hq`;
@@ -381,11 +379,9 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
 
     console.log('🎵 Preview URL:', previewUrl);
 
-    // Criar novo áudio
     const audio = new Audio();
     audio.crossOrigin = 'anonymous';
 
-    // Flag para evitar erros durante limpeza
     let isCleaning = false;
 
     audio.oncanplay = () => {
@@ -453,12 +449,6 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
     });
   };
 
-  const handleCategoryClick = (category: { label: string; query: string }) => {
-    setSelectedCategory(category.query);
-    setSearchQuery(category.query);
-    searchFreesound(category.query, 1);
-  };
-
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     searchFreesound(searchQuery, 1);
@@ -469,7 +459,35 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
     searchFreesound(tag, 1);
   };
 
+  const cleanAudioName = (name: string): string => {
+    let cleaned = name;
+
+    cleaned = cleaned.replace(/\.(mp3|wav|ogg|m4a|mp4)$/i, '');
+    cleaned = cleaned.replace(/^freesound_/i, '');
+    cleaned = cleaned.replace(/^pixabay_/i, '');
+    cleaned = cleaned.replace(/^audio-/i, '');
+    cleaned = cleaned.replace(/^tts_/i, '');
+    cleaned = cleaned.replace(/^\d+_/, '');
+    cleaned = cleaned.replace(/_\d{10,}_[a-z0-9]{6,}$/i, '');
+    cleaned = cleaned.replace(/_\d{10,}$/, '');
+    cleaned = cleaned.replace(/_/g, ' ');
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+    return cleaned || name;
+  };
+
+  const formatAudioDuration = (seconds?: number): string => {
+    if (!seconds || seconds <= 0) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const isBlocked = disabled || isUploading || isGenerating || isDownloading || isSearching;
+
+  // Calcular altura máxima para mostrar 10 itens
+  const maxHeight = MAX_VISIBLE_ITEMS * ITEM_HEIGHT;
+  const showScroll = availableAudios.length > MAX_VISIBLE_ITEMS;
 
   return (
     <div className="space-y-4">
@@ -520,28 +538,8 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
           </label>
         </div>
 
-        <div className="flex flex-wrap gap-1.5">
-          {searchCategories.map((cat) => (
-            <button
-              key={cat.label}
-              onClick={() => handleCategoryClick(cat)}
-              disabled={isBlocked}
-              className={`
-                text-[9px] px-2 py-1 rounded-full transition-colors
-                ${selectedCategory === cat.query
-                  ? "bg-blue-500/30 border border-blue-500/50 text-blue-300"
-                  : "bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20"
-                }
-                ${isBlocked ? "cursor-not-allowed opacity-50" : ""}
-              `}
-            >
-              {cat.label}
-            </button>
-          ))}
-        </div>
-
         <div className="flex flex-wrap gap-1">
-          {popularTags.slice(0, 8).map((tag) => (
+          {popularTags.slice(0, 12).map((tag) => (
             <button
               key={tag}
               onClick={() => handleTagClick(tag)}
@@ -645,7 +643,10 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
         )}
 
         {searchResults.length > 0 && (
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div
+            ref={resultsContainerRef}
+            className="space-y-2 max-h-64 overflow-y-auto"
+          >
             <div className="flex items-center justify-between text-[10px] text-gray-400">
               <span>{totalResults} resultados encontrados</span>
               <button
@@ -756,10 +757,19 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
               {audioFile ? "1 selecionado" : "Nenhum selecionado"}
             </span>
           </div>
-          <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+          <div
+            className="space-y-1 pr-1"
+            style={{
+              maxHeight: showScroll ? `${maxHeight}px` : 'none',
+              overflowY: showScroll ? 'auto' : 'visible',
+            }}
+          >
             {availableAudios.map((audioItem) => {
               const isSelected = selectedPath === audioItem.path;
               const isFreesound = audioItem.name.includes('Freesound') || audioItem.name.includes('freesound');
+              const cleanedName = cleanAudioName(audioItem.name);
+              const durationFormatted = formatAudioDuration(audioItem.duration);
+
               return (
                 <div
                   key={audioItem.path}
@@ -774,9 +784,14 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
                   onClick={() => !isBlocked && selectAudio(audioItem)}
                 >
                   <Music className={`w-4 h-4 flex-shrink-0 ${isSelected ? "text-blue-400" : "text-gray-400"}`} />
+                  {durationFormatted && (
+                    <span className="text-[10px] text-gray-500 flex-shrink-0 font-mono">
+                      {durationFormatted}
+                    </span>
+                  )}
                   <span className="flex-1 text-xs text-gray-300 truncate flex items-center gap-1">
-                    {isFreesound && <Search className="w-3 h-3 text-blue-400" />}
-                    {audioItem.name.length > 30 ? audioItem.name.substring(0, 30) + '...' : audioItem.name}
+                    {isFreesound && <Search className="w-3 h-3 text-blue-400 flex-shrink-0" />}
+                    {cleanedName.length > 28 ? cleanedName.substring(0, 28) + '...' : cleanedName}
                   </span>
                   {isSelected && (
                     <Check className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />

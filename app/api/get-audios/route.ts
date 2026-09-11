@@ -2,7 +2,42 @@
 import { NextResponse } from "next/server";
 import path from "path";
 import fs from "fs";
+import { exec } from "child_process";
 import { ensureAudioFolder, cleanAudioFolder } from "../../../lib/utils";
+
+// Função para obter duração do áudio usando ffprobe
+function getAudioDuration(filePath: string): Promise<number> {
+  return new Promise((resolve) => {
+    if (!fs.existsSync(filePath)) {
+      resolve(0);
+      return;
+    }
+
+    const ffprobe = exec(
+      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
+      (error, stdout) => {
+        if (error || !stdout) {
+          resolve(0);
+          return;
+        }
+        const duration = parseFloat(stdout.trim());
+        if (isNaN(duration) || duration <= 0) {
+          resolve(0);
+        } else {
+          resolve(duration);
+        }
+      }
+    );
+
+    // Timeout de 5 segundos
+    setTimeout(() => {
+      try {
+        ffprobe.kill();
+      } catch (e) { }
+      resolve(0);
+    }, 5000);
+  });
+}
 
 export async function GET() {
   try {
@@ -28,10 +63,14 @@ export async function GET() {
       try {
         const stats = fs.statSync(filePath);
         if (stats.size > 0) {
+          // Obter duração real do áudio
+          const duration = await getAudioDuration(filePath);
+
           audios.push({
             name: file,
             path: `/audio/${file}`,
             size: stats.size,
+            duration: duration,
             uploadedAt: stats.mtime,
           });
         } else {
