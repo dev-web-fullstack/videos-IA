@@ -9,19 +9,22 @@ import {
   Loader2,
   AlertCircle,
   Wand2,
-  Image as ImageIcon,
+  ChevronDown,
+  ChevronUp,
+  PenLine,
+  Dice5,
 } from "lucide-react";
 import {
   BackgroundType,
   backgroundColors,
   getRandomColor,
+  getRandomHexColor,
   getRandomPromptFromTheme,
   getRandomTheme,
   getThemeName,
   backgroundThemes,
   themeKeys,
   generatePollinationsUrl,
-  type BackgroundConfig,
 } from "../../lib/backgroundAnimations";
 
 interface BackgroundSelectorProps {
@@ -59,6 +62,9 @@ export default function BackgroundSelector({
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [currentPrompt, setCurrentPrompt] = useState("");
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [showAllThemes, setShowAllThemes] = useState(false);
 
   useEffect(() => {
     if (isGeneratingImage) {
@@ -76,18 +82,13 @@ export default function BackgroundSelector({
     }
   }, [isGeneratingImage]);
 
+  // Gerar imagem com tema selecionado
   const handleGenerateAI = async () => {
-    // Usar o texto ou prompt padrão
-    const textToUse = scriptText && scriptText.trim().length > 0
-      ? scriptText
-      : "Paisagem bíblica com luz divina, natureza, paz e esperança";
-
     if (onLoadingChange) onLoadingChange(true);
     setError(null);
     setProgress(0);
 
     try {
-      // Escolher um prompt aleatório do tema selecionado
       const prompt = getRandomPromptFromTheme(selectedTheme as keyof typeof backgroundThemes);
       setCurrentPrompt(prompt);
 
@@ -96,10 +97,40 @@ export default function BackgroundSelector({
       onTypeChange("ai-generated");
       onImageChange(url, prompt, selectedTheme);
 
-      console.log("🎨 Tema:", getThemeName(selectedTheme as keyof typeof backgroundThemes));
+      console.log("🎨 Tema:", getThemeName(selectedTheme));
       console.log("🎨 Prompt:", prompt);
       console.log("🖼️ URL:", url);
-      console.log(`📐 Resolução: ${width}x${height}`);
+
+    } catch (error) {
+      console.error("❌ Erro:", error);
+      setError("Erro ao gerar imagem. Tente novamente.");
+      onImageChange("", "", undefined);
+      if (onLoadingChange) onLoadingChange(false);
+    }
+  };
+
+  // Gerar imagem com prompt personalizado
+  const handleGenerateCustom = async () => {
+    if (!customPrompt.trim()) {
+      setError("Digite uma descrição para gerar a imagem");
+      return;
+    }
+
+    if (onLoadingChange) onLoadingChange(true);
+    setError(null);
+    setProgress(0);
+
+    try {
+      const prompt = customPrompt.trim();
+      setCurrentPrompt(prompt);
+
+      const url = generatePollinationsUrl(prompt, width, height);
+
+      onTypeChange("ai-generated");
+      onImageChange(url, prompt, "custom");
+
+      console.log("🎨 Prompt personalizado:", prompt);
+      console.log("🖼️ URL:", url);
 
     } catch (error) {
       console.error("❌ Erro:", error);
@@ -116,6 +147,12 @@ export default function BackgroundSelector({
     }
   };
 
+  const handleRandomCustomPrompt = () => {
+    const randomTheme = getRandomTheme();
+    const prompt = getRandomPromptFromTheme(randomTheme);
+    setCustomPrompt(prompt);
+  };
+
   const getStatusMessage = () => {
     if (isGeneratingImage) {
       if (progress < 30) return "🔄 Inicializando...";
@@ -126,33 +163,128 @@ export default function BackgroundSelector({
     return null;
   };
 
-  const currentThemeName = getThemeName(selectedTheme as keyof typeof backgroundThemes);
+  const currentThemeName = getThemeName(selectedTheme);
+
+  // Temas a exibir (todos ou apenas 8 primeiros)
+  const visibleThemes = showAllThemes ? themeKeys : themeKeys.slice(0, 8);
 
   return (
     <div className="space-y-4">
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-1 h-5 bg-gradient-to-b from-purple-400 to-pink-400 rounded-full"></div>
-          <h3 className="text-sm font-semibold text-white">
-            Fundo do Vídeo
-          </h3>
-        </div>
-        <span className="text-[10px] text-gray-500 font-mono bg-white/5 px-2 py-0.5 rounded">
-          {width}×{height}
-        </span>
+      {/* ============================================ */}
+      {/* CAMPO DE PROMPT PERSONALIZADO */}
+      {/* ============================================ */}
+      <div className="space-y-2">
+        <button
+          onClick={() => setShowCustomInput(!showCustomInput)}
+          disabled={isGeneratingImage}
+          className={`
+            w-full flex items-center justify-between px-3 py-2 rounded-lg
+            bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700/50
+            text-xs text-gray-400 hover:text-white transition-all
+            ${isGeneratingImage ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+          `}
+        >
+          <span className="flex items-center gap-2">
+            <PenLine className="w-3.5 h-3.5" />
+            Criar imagem com IA
+          </span>
+          {showCustomInput ? (
+            <ChevronUp className="w-3.5 h-3.5" />
+          ) : (
+            <ChevronDown className="w-3.5 h-3.5" />
+          )}
+        </button>
+
+        {showCustomInput && (
+          <div className="space-y-2 p-3 rounded-lg bg-gray-800/30 border border-gray-700/30">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] text-gray-400 font-medium">
+                Descreva a imagem que deseja criar
+              </label>
+              <button
+                onClick={handleRandomCustomPrompt}
+                disabled={isGeneratingImage}
+                className="text-[10px] text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
+              >
+                <Dice5 className="w-3 h-3" />
+                Aleatório
+              </button>
+            </div>
+            <textarea
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              placeholder="Ex: paisagem montanhosa com neve ao pôr do sol, cores quentes..."
+              disabled={isGeneratingImage}
+              className="w-full h-20 rounded-lg bg-gray-800/50 border border-gray-700/50 p-2.5 text-white text-xs placeholder-gray-500 focus:border-purple-500/50 focus:outline-none resize-none"
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] text-gray-500">
+                {customPrompt.length} caracteres
+              </span>
+              <button
+                onClick={handleGenerateCustom}
+                disabled={isGeneratingImage || !customPrompt.trim()}
+                className={`
+                  flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all
+                  ${isGeneratingImage || !customPrompt.trim()
+                    ? "bg-gray-700/50 cursor-not-allowed opacity-60"
+                    : "bg-gradient-to-r from-purple-600/30 to-pink-600/30 hover:from-purple-600/40 hover:to-pink-600/40 border border-purple-500/30 text-white"
+                  }
+                `}
+              >
+                {isGeneratingImage ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Wand2 className="w-3 h-3" />
+                )}
+                Gerar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Status da imagem */}
-      {backgroundType === "ai-generated" && imageUrl && !isGeneratingImage && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-          <span className="text-xs text-emerald-300">Imagem gerada!</span>
-        </div>
-      )}
+      {/* ============================================ */}
+      {/* SEPARADOR */}
+      {/* ============================================ */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-px bg-gray-700/50" />
+        <span className="text-[9px] text-gray-500 uppercase tracking-wider">ou use um tema</span>
+        <div className="flex-1 h-px bg-gray-700/50" />
+      </div>
 
-      {/* Barra de progresso */}
+      {/* ============================================ */}
+      {/* BOTÃO GERAR COM TEMA */}
+      {/* ============================================ */}
+      <button
+        onClick={handleGenerateAI}
+        disabled={isGeneratingImage}
+        className={`
+          w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl
+          font-medium text-sm transition-all duration-200
+          ${isGeneratingImage
+            ? "bg-gray-700/50 cursor-not-allowed opacity-60"
+            : "bg-gradient-to-r from-purple-600/20 to-pink-600/20 hover:from-purple-600/30 hover:to-pink-600/30 border border-purple-500/30 text-white"
+          }
+        `}
+      >
+        {isGeneratingImage ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Gerando...</span>
+          </>
+        ) : (
+          <>
+            <Wand2 className="w-4 h-4" />
+            <span>✨ Gerar com Tema</span>
+          </>
+        )}
+      </button>
+
+      {/* ============================================ */}
+      {/* BARRA DE PROGRESSO */}
+      {/* ============================================ */}
       {isGeneratingImage && (
         <div className="space-y-2 p-3 rounded-lg bg-purple-500/5 border border-purple-500/20">
           <div className="flex items-center justify-between">
@@ -178,56 +310,58 @@ export default function BackgroundSelector({
         </div>
       )}
 
-      {/* Erro */}
+      {/* ============================================ */}
+      {/* ERRO */}
+      {/* ============================================ */}
       {error && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
           <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
           <span className="text-xs text-red-300">{error}</span>
+          <button
+            onClick={() => setError(null)}
+            className="ml-auto text-red-400 hover:text-red-300"
+          >
+            ✕
+          </button>
         </div>
       )}
 
-      {/* Botão Gerar com IA */}
-      <button
-        onClick={handleGenerateAI}
-        disabled={isGeneratingImage}
-        className={`
-          w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl
-          font-medium text-sm transition-all duration-200
-          ${isGeneratingImage
-            ? "bg-gray-700/50 cursor-not-allowed opacity-60"
-            : "bg-gradient-to-r from-purple-600/20 to-pink-600/20 hover:from-purple-600/30 hover:to-pink-600/30 border border-purple-500/30 hover:border-purple-400/50 text-white"
-          }
-        `}
-      >
-        {isGeneratingImage ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span>Gerando...</span>
-          </>
-        ) : (
-          <>
-            <Wand2 className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-            <span>Gerar com IA</span>
-          </>
-        )}
-      </button>
+      {/* ============================================ */}
+      {/* STATUS DA IMAGEM GERADA */}
+      {/* ============================================ */}
+      {backgroundType === "ai-generated" && imageUrl && !isGeneratingImage && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+          <Check className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+          <span className="text-xs text-emerald-300">Imagem gerada!</span>
+        </div>
+      )}
 
-      {/* Selector de Temas */}
+      {/* ============================================ */}
+      {/* SELETOR DE TEMAS */}
+      {/* ============================================ */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="text-xs text-gray-400 font-medium">
-            Tema da Imagem
+            Temas ({themeKeys.length})
           </label>
-          <button
-            onClick={handleRandomTheme}
-            disabled={isGeneratingImage}
-            className="text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
-          >
-            🎲 Aleatório
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAllThemes(!showAllThemes)}
+              className="text-[10px] text-gray-500 hover:text-white transition-colors"
+            >
+              {showAllThemes ? 'Ver menos' : 'Ver todos'}
+            </button>
+            <button
+              onClick={handleRandomTheme}
+              disabled={isGeneratingImage}
+              className="text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
+            >
+              🎲 Aleatório
+            </button>
+          </div>
         </div>
         <div className="grid grid-cols-4 gap-1.5">
-          {themeKeys.map((themeKey) => {
+          {visibleThemes.map((themeKey) => {
             const theme = backgroundThemes[themeKey];
             const isSelected = selectedTheme === themeKey;
             return (
@@ -258,7 +392,9 @@ export default function BackgroundSelector({
         </div>
       </div>
 
-      {/* Botão para fundo sólido */}
+      {/* ============================================ */}
+      {/* BOTÃO FUNDO SÓLIDO */}
+      {/* ============================================ */}
       <button
         onClick={() => {
           onTypeChange("solid");
@@ -275,7 +411,7 @@ export default function BackgroundSelector({
             ? "bg-gray-700/50 cursor-not-allowed opacity-60"
             : backgroundType === "solid"
               ? "bg-emerald-500/20 border border-emerald-500/30 text-emerald-300"
-              : "bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white"
+              : "bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700/50 text-gray-300 hover:text-white"
           }
         `}
       >
@@ -283,71 +419,124 @@ export default function BackgroundSelector({
         <span>Fundo Sólido</span>
       </button>
 
-      {/* Cor de fundo (apenas para sólido) */}
+      {/* ============================================ */}
+      {/* CORES DE FUNDO (apenas para sólido) */}
+      {/* ============================================ */}
       {backgroundType === "solid" && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-[10px] text-gray-400 uppercase tracking-wider">
-              Cores disponíveis
-            </label>
-            <span className="text-[10px] text-gray-500">
-              {backgroundColors.length} cores
-            </span>
-          </div>
-          <div className="grid grid-cols-7 gap-1.5">
-            {backgroundColors.map((color) => (
+        <div className="space-y-3">
+          {/* Cores predefinidas */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] text-gray-400 uppercase tracking-wider">
+                Cores predefinidas
+              </label>
               <button
-                key={color.value}
-                onClick={() => onColorChange(color.value)}
+                onClick={() => onColorChange(getRandomColor())}
+                disabled={isGeneratingImage}
+                className="text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                🎲 Aleatório
+              </button>
+            </div>
+            <div className="grid grid-cols-7 gap-1.5">
+              {backgroundColors.map((color) => (
+                <button
+                  key={color.value}
+                  onClick={() => onColorChange(color.value)}
+                  disabled={isGeneratingImage}
+                  className={`
+                    group relative w-full aspect-square rounded-lg border-2 transition-all duration-200
+                    ${isGeneratingImage
+                      ? "cursor-not-allowed opacity-50"
+                      : backgroundColor === color.value
+                        ? "border-emerald-400 scale-110 shadow-lg shadow-emerald-500/20"
+                        : "border-gray-700 hover:border-gray-500 hover:scale-105"
+                    }
+                  `}
+                  style={{ backgroundColor: color.value }}
+                  title={color.label}
+                >
+                  {backgroundColor === color.value && (
+                    <Check className="absolute inset-0 m-auto w-3 h-3 text-white drop-shadow-lg" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Cor personalizada */}
+          <div className="space-y-2 p-3 rounded-lg bg-gray-800/30 border border-gray-700/30">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] text-gray-400 uppercase tracking-wider">
+                Cor personalizada
+              </label>
+              <button
+                onClick={() => onColorChange(getRandomHexColor())}
+                disabled={isGeneratingImage}
+                className="text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
+              >
+                🎲 Aleatória
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={backgroundColor}
+                onChange={(e) => onColorChange(e.target.value)}
                 disabled={isGeneratingImage}
                 className={`
-                  group relative w-full aspect-square rounded-lg border-2 transition-all duration-200
-                  ${isGeneratingImage
-                    ? "cursor-not-allowed opacity-50"
-                    : backgroundColor === color.value
-                      ? "border-emerald-400 scale-110 shadow-lg shadow-emerald-500/20"
-                      : "border-gray-700 hover:border-gray-500 hover:scale-105"
-                  }
+                  w-12 h-12 rounded-lg bg-gray-800/50 border-2 border-gray-700/50 cursor-pointer
+                  hover:border-purple-500/50 transition-colors
+                  ${isGeneratingImage ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
-                style={{ backgroundColor: color.value }}
-                title={color.label}
-              >
-                {backgroundColor === color.value && (
-                  <Check className="absolute inset-0 m-auto w-3 h-3 text-white drop-shadow-lg" />
-                )}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-gray-500">
-              Cor atual: <span className="font-mono text-gray-400">{backgroundColor}</span>
-            </span>
-            <button
-              onClick={() => onColorChange(getRandomColor())}
-              disabled={isGeneratingImage}
-              className="text-[10px] text-purple-400 hover:text-purple-300 transition-colors"
-            >
-              Aleatório
-            </button>
+                title="Escolher cor personalizada"
+              />
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={backgroundColor}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (/^#[0-9A-Fa-f]{0,6}$/.test(value)) {
+                      onColorChange(value);
+                    }
+                  }}
+                  disabled={isGeneratingImage}
+                  placeholder="#000000"
+                  className={`
+                    w-full px-3 py-2 rounded-lg bg-gray-800/50 border border-gray-700/50 
+                    text-white text-sm font-mono focus:border-purple-500/50 focus:outline-none
+                    ${isGeneratingImage ? 'opacity-50 cursor-not-allowed' : ''}
+                  `}
+                />
+              </div>
+            </div>
+            <div className="text-[9px] text-gray-500 text-center">
+              Clique no quadrado para escolher ou digite o código hexadecimal
+            </div>
           </div>
         </div>
       )}
 
-      {/* Prompt atual (apenas se tiver imagem) */}
+      {/* ============================================ */}
+      {/* PROMPT ATUAL */}
+      {/* ============================================ */}
       {backgroundType === "ai-generated" && imageUrl && !isGeneratingImage && currentPrompt && (
-        <div className="rounded-lg bg-blue-900/20 border border-blue-700/30 p-2">
+        <div className="rounded-lg bg-blue-500/5 border border-blue-500/10 p-2">
           <p className="text-[10px] text-blue-300 text-center truncate" title={currentPrompt}>
             📝 {currentPrompt}
           </p>
         </div>
       )}
 
-      {/* Dica para IA */}
+      {/* ============================================ */}
+      {/* DICA PARA IA */}
+      {/* ============================================ */}
       {backgroundType === "ai-generated" && !imageUrl && !isGeneratingImage && !error && (
         <div className="flex items-start gap-2 p-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
           <Sparkles className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
           <p className="text-[10px] text-gray-400 leading-relaxed">
-            Selecione um tema e clique em "Gerar com IA" para criar uma imagem de fundo.
+            Escolha um tema ou crie uma imagem personalizada com sua própria descrição.
           </p>
         </div>
       )}

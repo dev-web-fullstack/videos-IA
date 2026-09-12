@@ -17,7 +17,6 @@ import {
   Clock,
   User,
   Tag,
-  Sparkles,
 } from "lucide-react";
 import {
   popularTags,
@@ -51,10 +50,6 @@ interface AudioUploaderProps {
   onPreviewStateChange?: (isPlaying: boolean) => void;
 }
 
-// Número máximo de itens antes de mostrar scroll
-const MAX_VISIBLE_ITEMS = 10;
-const ITEM_HEIGHT = 44; // altura aproximada de cada item em px
-
 const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderProps>(({
   onAudioChange,
   audioFile,
@@ -68,7 +63,9 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
 
   const [availableAudios, setAvailableAudios] = useState<AvailableAudio[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingAudios, setIsLoadingAudios] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const resultsContainerRef = useRef<HTMLDivElement>(null);
@@ -107,7 +104,13 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
 
   const loadAudios = async () => {
     try {
-      const response = await fetch("/api/get-audios");
+      setIsLoadingAudios(true);
+      const response = await fetch("/api/get-audios", {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       const data = await response.json();
       if (data.audios) {
         setAvailableAudios(data.audios);
@@ -116,8 +119,29 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
       console.error("❌ Erro ao carregar áudios:", error);
     } finally {
       setIsLoading(false);
+      setIsLoadingAudios(false);
     }
   };
+
+  useEffect(() => {
+    loadAudios();
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadAudios();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     loadAudios();
@@ -174,54 +198,88 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
     });
   };
 
-  const handleUpload = async (file: File) => {
-    if (!file) return;
+  // ============================================
+  // UPLOAD MÚLTIPLO DE ÁUDIOS
+  // ============================================
+  const handleMultipleUpload = async (files: File[]) => {
+    if (!files || files.length === 0) return;
 
     const allowedTypes = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/ogg", "audio/mp4"];
-    if (!allowedTypes.includes(file.type)) {
-      alert("Formato de áudio não suportado. Use MP3, WAV, OGG ou M4A.");
-      return;
+    const validFiles: File[] = [];
+    const invalidFiles: string[] = [];
+
+    for (const file of files) {
+      if (!allowedTypes.includes(file.type)) {
+        invalidFiles.push(file.name);
+        continue;
+      }
+      if (file.size > 50 * 1024 * 1024) {
+        invalidFiles.push(`${file.name} (muito grande)`);
+        continue;
+      }
+      validFiles.push(file);
     }
 
-    if (file.size > 50 * 1024 * 1024) {
-      alert("Arquivo muito grande. Máximo 50MB.");
-      return;
+    if (invalidFiles.length > 0) {
+      alert(`Alguns arquivos não foram aceitos:\n${invalidFiles.join('\n')}`);
     }
+
+    if (validFiles.length === 0) return;
 
     if (isPlaying) {
       stopPreview();
     }
 
     setIsUploading(true);
+    setUploadProgress({ current: 0, total: validFiles.length });
 
-    try {
-      const formData = new FormData();
-      formData.append("audio", file);
+    let successCount = 0;
+    let lastUploadedPath: string | null = null;
+    let lastUploadedName: string | null = null;
 
-      const response = await fetch("/api/upload-audio", {
-        method: "POST",
-        body: formData,
-      });
+    for (let i = 0; i < validFiles.length; i++) {
+      const file = validFiles[i];
+      setUploadProgress({ current: i + 1, total: validFiles.length });
 
-      const data = await response.json();
+      try {
+        const formData = new FormData();
+        formData.append("audio", file);
 
-      if (data.success) {
-        await loadAudios();
-        const newAudio = {
-          name: data.name || file.name,
-          path: data.audioPath,
-          size: data.size || file.size,
-        };
-        setSelectedPath(data.audioPath);
-        onAudioChange(newAudio);
-      } else {
-        alert(data.error || "Erro ao fazer upload do áudio");
+        const response = await fetch("/api/upload-audio", {
+          method: "POST",
+          body: formData,
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          successCount++;
+          lastUploadedPath = data.audioPath;
+          lastUploadedName = data.name || file.name;
+        } else {
+          console.error(`❌ Erro ao enviar ${file.name}:`, data.error);
+        }
+      } catch (error) {
+        console.error(`❌ Erro ao enviar ${file.name}:`, error);
       }
-    } catch (error) {
-      console.error("❌ Erro:", error);
-      alert("Erro ao fazer upload do áudio");
-    } finally {
-      setIsUploading(false);
+    }
+
+    await loadAudios();
+
+    if (lastUploadedPath && lastUploadedName) {
+      setSelectedPath(lastUploadedPath);
+      onAudioChange({
+        name: lastUploadedName,
+        path: lastUploadedPath,
+        size: 0,
+      });
+    }
+
+    setIsUploading(false);
+    setUploadProgress({ current: 0, total: 0 });
+
+    if (successCount > 0) {
+      console.log(`✅ ${successCount} áudio(s) enviado(s) com sucesso`);
     }
   };
 
@@ -307,9 +365,6 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
     setIsDownloading(true);
 
     try {
-      console.log('🎵 Baixando áudio do Freesound:', sound.name);
-      console.log('🔗 Preview URL:', sound.preview_url);
-
       const response = await fetch("/api/freesound-download", {
         method: "POST",
         headers: {
@@ -377,8 +432,6 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
       previewUrl = `/api/freesound-preview?id=${sound.id}&quality=hq`;
     }
 
-    console.log('🎵 Preview URL:', previewUrl);
-
     const audio = new Audio();
     audio.crossOrigin = 'anonymous';
 
@@ -386,12 +439,10 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
 
     audio.oncanplay = () => {
       if (isCleaning) return;
-      console.log('✅ Preview carregado, duração:', audio.duration);
     };
 
     audio.onended = () => {
       if (isCleaning) return;
-      console.log('⏹️ Preview terminou');
       setIsPlaying(false);
       setCurrentPreviewId(null);
       if (previewAudio) {
@@ -404,11 +455,9 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
     audio.onerror = (e) => {
       if (isCleaning) return;
       if (!audio.src || audio.src === '' || audio.src === 'http://localhost:3000/') {
-        console.log('⏹️ Áudio limpo (ignorando erro)');
         return;
       }
       console.error('❌ Erro no preview:', e);
-      console.error('❌ audio.src:', audio.src);
       setIsPlaying(false);
       setCurrentPreviewId(null);
       audio.pause();
@@ -485,10 +534,6 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
 
   const isBlocked = disabled || isUploading || isGenerating || isDownloading || isSearching;
 
-  // Calcular altura máxima para mostrar 10 itens
-  const maxHeight = MAX_VISIBLE_ITEMS * ITEM_HEIGHT;
-  const showScroll = availableAudios.length > MAX_VISIBLE_ITEMS;
-
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 flex-wrap">
@@ -505,13 +550,16 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
         >
           {isUploading ? (
             <>
-              <span className="animate-spin">⏳</span>
-              Enviando...
+              <Loader2 className="w-4 h-4 animate-spin" />
+              {uploadProgress.total > 1
+                ? `Enviando ${uploadProgress.current}/${uploadProgress.total}...`
+                : "Enviando..."
+              }
             </>
           ) : (
             <>
               <Upload className="w-4 h-4" />
-              Upload Áudio
+              Upload Áudios
             </>
           )}
         </button>
@@ -519,15 +567,18 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
           ref={fileInputRef}
           type="file"
           accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/mp4"
+          multiple
           onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleUpload(file);
+            const files = e.target.files;
+            if (files && files.length > 0) {
+              handleMultipleUpload(Array.from(files));
+            }
             e.target.value = "";
           }}
           className="hidden"
           disabled={isBlocked}
         />
-        <span className="text-[10px] text-gray-500">MP3, WAV, OGG, M4A (max 50MB)</span>
+        <span className="text-[10px] text-gray-500">MP3, WAV, OGG, M4A (max 50MB cada)</span>
       </div>
 
       <div className="space-y-3 border-t border-gray-700/50 pt-3">
@@ -694,11 +745,6 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
                         <Tag className="w-3 h-3 ml-1" />
                         {sound.tags.slice(0, 3).join(', ')}
                       </div>
-                      {sound.description && (
-                        <div className="text-[9px] text-gray-500 truncate mt-0.5">
-                          {sound.description}
-                        </div>
-                      )}
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <span className="text-[8px] text-gray-500">{formatFileSize(sound.filesize)}</span>
@@ -747,23 +793,26 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
         )}
       </div>
 
-      {!isLoading && availableAudios.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label className="text-[10px] text-gray-400 uppercase tracking-wider">
-              Áudios disponíveis ({availableAudios.length})
-            </label>
-            <span className="text-[10px] text-gray-500">
-              {audioFile ? "1 selecionado" : "Nenhum selecionado"}
-            </span>
-          </div>
-          <div
-            className="space-y-1 pr-1"
-            style={{
-              maxHeight: showScroll ? `${maxHeight}px` : 'none',
-              overflowY: showScroll ? 'auto' : 'visible',
-            }}
-          >
+      {/* Lista de Áudios Disponíveis - SEM BARRA DE ROLAGEM */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-[10px] text-gray-400 uppercase tracking-wider flex items-center gap-1">
+            <Music className="w-3 h-3" />
+            Áudios disponíveis ({availableAudios.length})
+            {isLoadingAudios && (
+              <span className="ml-1 text-pink-400 animate-pulse normal-case">
+                Carregando...
+              </span>
+            )}
+          </label>
+          <span className="text-[10px] text-gray-500">
+            {audioFile ? "1 selecionado" : "Nenhum selecionado"}
+          </span>
+        </div>
+
+        {/* Lista de áudios ou mensagem vazia - SEM SCROLL */}
+        {availableAudios.length > 0 ? (
+          <div className="space-y-1">
             {availableAudios.map((audioItem) => {
               const isSelected = selectedPath === audioItem.path;
               const isFreesound = audioItem.name.includes('Freesound') || audioItem.name.includes('freesound');
@@ -776,25 +825,27 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
                   className={`
                     flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer group
                     ${isSelected
-                      ? "border-blue-400 bg-blue-600/20"
+                      ? "border-purple-400 bg-purple-600/20"
                       : "border-gray-700 hover:border-gray-500 bg-gray-800/30"
                     }
                     ${isBlocked ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
                   `}
                   onClick={() => !isBlocked && selectAudio(audioItem)}
                 >
-                  <Music className={`w-4 h-4 flex-shrink-0 ${isSelected ? "text-blue-400" : "text-gray-400"}`} />
+                  <Music className={`w-4 h-4 flex-shrink-0 ${isSelected ? "text-purple-400" : "text-gray-400"}`} />
                   {durationFormatted && (
                     <span className="text-[10px] text-gray-500 flex-shrink-0 font-mono">
                       {durationFormatted}
                     </span>
                   )}
                   <span className="flex-1 text-xs text-gray-300 truncate flex items-center gap-1">
-                    {isFreesound && <Search className="w-3 h-3 text-blue-400 flex-shrink-0" />}
-                    {cleanedName.length > 28 ? cleanedName.substring(0, 28) + '...' : cleanedName}
+                    {isFreesound && <Search className="w-3 h-3 text-purple-400 flex-shrink-0" />}
+                    {cleanedName.length > 30
+                      ? cleanedName.substring(0, 30) + '...'
+                      : cleanedName}
                   </span>
                   {isSelected && (
-                    <Check className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />
+                    <Check className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
                   )}
                   <button
                     onClick={(e) => {
@@ -810,8 +861,17 @@ const AudioUploader = forwardRef<{ pausePreview: () => boolean }, AudioUploaderP
               );
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          !isLoadingAudios && (
+            <div className="text-center py-4 rounded-lg border border-dashed border-gray-700/50">
+              <Music className="w-6 h-6 text-gray-600 mx-auto mb-1" />
+              <p className="text-[10px] text-gray-500">
+                Nenhum áudio disponível ainda
+              </p>
+            </div>
+          )
+        )}
+      </div>
 
       {isDownloading && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/10 border border-blue-500/20">

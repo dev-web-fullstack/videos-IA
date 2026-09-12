@@ -99,9 +99,33 @@ export default function Home() {
   const isMounted = useRef(true);
   const isImageLoadingRef = useRef(false);
 
+  // Ref para medir a altura da navbar
+  const navbarRef = useRef<HTMLDivElement>(null);
+  const [navbarHeight, setNavbarHeight] = useState(140);
+
   const [textStyle, setTextStyle] = useState<TextStyle>(
     createDefaultTextStyle({ width: 1920, height: 1080 })
   );
+
+  // Medir a altura real da navbar
+  useEffect(() => {
+    const measureNavbar = () => {
+      if (navbarRef.current) {
+        const height = navbarRef.current.getBoundingClientRect().height;
+        setNavbarHeight(height);
+        console.log('📏 Altura da navbar:', height, 'px');
+      }
+    };
+
+    measureNavbar();
+    const timeout = setTimeout(measureNavbar, 100);
+    window.addEventListener('resize', measureNavbar);
+
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('resize', measureNavbar);
+    };
+  }, []);
 
   const pauseAudioPreview = () => {
     if (audioPreviewRef.current) {
@@ -457,8 +481,11 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
 
-      {/* HEADER + NAVBAR SUPERIOR */}
-      <div className="border-b border-white/5 bg-black/30 backdrop-blur-xl sticky top-0 z-50">
+      {/* HEADER + NAVBAR SUPERIOR - FIXA */}
+      <div
+        ref={navbarRef}
+        className="border-b border-white/5 bg-black/30 backdrop-blur-xl fixed top-0 left-0 right-0 z-50"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <Header />
 
@@ -555,16 +582,21 @@ export default function Home() {
         </div>
       </div>
 
+      {/* ESPAÇADOR PARA COMPENSAR A NAVBAR FIXA */}
+      <div style={{ height: `${navbarHeight}px` }} />
+
       {/* CONTEÚDO PRINCIPAL */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {/* 
-          Layout: flex em desktop.
-          A sidebar tem altura natural (determinada pelo conteúdo).
-          A área de preview usa position: sticky para permanecer visível.
+          ESTRUTURA CORRIGIDA:
+          - O container do flex tem `items-start` (impede esticar)
+          - O preview tem um wrapper com `lg:sticky` 
+          - O wrapper sticky tem `top` calculado + `self-start`
+          - A sidebar cresce naturalmente (sem limites)
         */}
         <div className="flex flex-col lg:flex-row lg:items-start gap-6">
 
-          {/* Sidebar - Controles (rola normalmente) */}
+          {/* Sidebar - Controles */}
           <div className="w-full lg:w-[420px] lg:flex-shrink-0 space-y-4">
             {/* Tabs Navigation */}
             <div className="flex rounded-xl bg-white/5 border border-white/10 p-1">
@@ -594,6 +626,7 @@ export default function Home() {
 
             {/* Conteúdo das Tabs */}
             <div className={`bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4 transition-all duration-300 ${isBlocked ? 'opacity-60 pointer-events-none' : ''}`}>
+
               {activeTab === "text" && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -625,9 +658,9 @@ export default function Home() {
               {activeTab === "tts" && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Mic className="w-5 h-5 text-purple-400" />
+                    <Mic className="w-5 h-5 text-pink-400" />
                     <h3 className="text-white font-semibold">Gerar Voz</h3>
-                    <span className="text-[10px] text-purple-400/60 bg-purple-500/10 px-2 py-0.5 rounded-full ml-auto">
+                    <span className="text-[10px] text-pink-400/60 bg-pink-500/10 px-2 py-0.5 rounded-full ml-auto">
                       Fish Audio S2.1 Pro
                     </span>
                   </div>
@@ -643,8 +676,11 @@ export default function Home() {
               {activeTab === "background" && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Image className="w-5 h-5 text-purple-400" />
+                    <Image className="w-5 h-5 text-pink-400" />
                     <h3 className="text-white font-semibold">Fundo do Vídeo</h3>
+                    <span className="text-[10px] text-pink-400/60 bg-pink-500/10 px-2 py-0.5 rounded-full ml-auto">
+                      Pollinations.ai
+                    </span>
                   </div>
                   <BackgroundSelector
                     key={imageLoadKey}
@@ -688,6 +724,9 @@ export default function Home() {
                   <div className="flex items-center gap-2 mb-2">
                     <Music className="w-5 h-5 text-pink-400" />
                     <h3 className="text-white font-semibold">Áudio do Vídeo</h3>
+                    <span className="text-[10px] text-pink-400/60 bg-pink-500/10 px-2 py-0.5 rounded-full ml-auto">
+                      Freesound
+                    </span>
                   </div>
                   <AudioUploader
                     key={audioFile?.path || 'no-audio'}
@@ -705,7 +744,7 @@ export default function Home() {
               )}
             </div>
 
-            {/* AVISOS */}
+            {/* AVISOS - Fundo IA */}
             {backgroundType === "ai-generated" && !backgroundImage && !isGeneratingImage && (
               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-900/30 border border-yellow-700/50 text-yellow-400 text-xs">
                 <Shield className="w-4 h-4" /> Gere uma imagem de fundo com IA primeiro!
@@ -719,8 +758,17 @@ export default function Home() {
             )}
           </div>
 
-          {/* Área Principal - Preview STICKY */}
-          <div className="w-full lg:flex-1 lg:sticky lg:top-[140px] lg:self-start space-y-4">
+          {/* 
+            Área Principal - Preview STICKY
+            
+            IMPORTANTE: O sticky está no PRIMEIRO FILHO da coluna (self-start),
+            não em um wrapper interno. Isso permite que o sticky "grude" 
+            corretamente na viewport, mesmo quando a sidebar é maior.
+          */}
+          <div
+            className="w-full lg:flex-1 lg:sticky lg:self-start space-y-4"
+            style={{ top: `${navbarHeight + 16}px` }}
+          >
             {/* Preview do Vídeo */}
             <div className="bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 p-4">
               <LiveTextPreview

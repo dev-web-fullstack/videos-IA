@@ -24,9 +24,6 @@ interface MediaManagerProps {
   disabled?: boolean;
 }
 
-const MAX_VISIBLE_ITEMS = 10;
-const ITEM_HEIGHT = 48;
-
 export default function MediaManager({
   onImagesChange,
   selectedImages,
@@ -36,11 +33,18 @@ export default function MediaManager({
   const [availableImages, setAvailableImages] = useState<UploadedImage[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingImages, setIsLoadingImages] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadImages = async () => {
     try {
-      const response = await fetch("/api/get-images");
+      setIsLoadingImages(true);
+      const response = await fetch("/api/get-images", {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
       const data = await response.json();
       if (data.images) {
         setAvailableImages(data.images);
@@ -49,8 +53,29 @@ export default function MediaManager({
       console.error("❌ Erro ao carregar imagens:", error);
     } finally {
       setIsLoading(false);
+      setIsLoadingImages(false);
     }
   };
+
+  useEffect(() => {
+    loadImages();
+  }, []);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadImages();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     loadImages();
@@ -143,11 +168,6 @@ export default function MediaManager({
     }
   };
 
-  const removeFromVideo = (imagePath: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    onImagesChange(selectedImages.filter(img => img.path !== imagePath));
-  };
-
   const isSelected = (imagePath: string) => {
     return selectedImages.some(img => img.path === imagePath);
   };
@@ -164,9 +184,6 @@ export default function MediaManager({
     return cleaned || name;
   };
 
-  const maxHeight = MAX_VISIBLE_ITEMS * ITEM_HEIGHT;
-  const showScroll = availableImages.length > MAX_VISIBLE_ITEMS;
-
   return (
     <div className="space-y-4">
       {/* Área de upload */}
@@ -178,7 +195,7 @@ export default function MediaManager({
             flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all
             ${disabled || isUploading
               ? "bg-gray-700/50 cursor-not-allowed opacity-60"
-              : "bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-white"
+              : "bg-pink-600/20 hover:bg-pink-600/30 border border-pink-500/30 text-white"
             }
           `}
         >
@@ -190,7 +207,7 @@ export default function MediaManager({
           ) : (
             <>
               <Upload className="w-4 h-4" />
-              Upload Mídia
+              Upload Mídias
             </>
           )}
         </button>
@@ -226,25 +243,26 @@ export default function MediaManager({
         </span>
       </div>
 
-      {/* Lista de Mídias Disponíveis */}
-      {!isLoading && availableImages.length > 0 && (
-        <div className="space-y-2 border-t border-gray-700/50 pt-3">
-          <div className="flex items-center justify-between">
-            <label className="text-[10px] text-gray-400 uppercase tracking-wider flex items-center gap-1">
-              <FolderOpen className="w-3 h-3" />
-              Mídias Disponíveis ({availableImages.length})
-            </label>
-            <span className="text-[10px] text-gray-500">
-              {selectedImages.length > 0 ? `${selectedImages.length} selecionada(s)` : "Nenhuma selecionada"}
-            </span>
-          </div>
-          <div
-            className="space-y-1 pr-1"
-            style={{
-              maxHeight: showScroll ? `${maxHeight}px` : 'none',
-              overflowY: showScroll ? 'auto' : 'visible',
-            }}
-          >
+      {/* Lista de Mídias Disponíveis - SEM BARRA DE ROLAGEM */}
+      <div className="space-y-2 border-t border-gray-700/50 pt-3">
+        <div className="flex items-center justify-between">
+          <label className="text-[10px] text-gray-400 uppercase tracking-wider flex items-center gap-1">
+            <FolderOpen className="w-3 h-3" />
+            Mídias Disponíveis ({availableImages.length})
+            {isLoadingImages && (
+              <span className="ml-1 text-pink-400 animate-pulse normal-case">
+                Carregando...
+              </span>
+            )}
+          </label>
+          <span className="text-[10px] text-gray-500">
+            {selectedImages.length > 0 ? `${selectedImages.length} selecionada(s)` : "Nenhuma selecionada"}
+          </span>
+        </div>
+
+        {/* Lista de mídias ou mensagem vazia - SEM SCROLL */}
+        {availableImages.length > 0 ? (
+          <div className="space-y-1">
             {availableImages.map((img) => {
               const selected = isSelected(img.path);
               const cleanedName = cleanImageName(img.name);
@@ -270,7 +288,7 @@ export default function MediaManager({
                     />
                   </div>
                   <span className="flex-1 text-xs text-gray-300 truncate">
-                    {cleanedName.length > 28 ? cleanedName.substring(0, 28) + '...' : cleanedName}
+                    {cleanedName.length > 30 ? cleanedName.substring(0, 30) + '...' : cleanedName}
                   </span>
                   <span className="text-[10px] text-gray-500 flex-shrink-0">
                     {(img.size / 1024).toFixed(0)}KB
@@ -289,10 +307,19 @@ export default function MediaManager({
               );
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          !isLoadingImages && (
+            <div className="text-center py-4 rounded-lg border border-dashed border-gray-700/50">
+              <ImageIcon className="w-6 h-6 text-gray-600 mx-auto mb-1" />
+              <p className="text-[10px] text-gray-500">
+                Nenhuma mídia carregada ainda
+              </p>
+            </div>
+          )
+        )}
+      </div>
 
-      {/* Imagens selecionadas no vídeo */}
+      {/* Mídias selecionadas no vídeo */}
       {selectedImages.length > 0 && (
         <div className="space-y-2 border-t border-gray-700/50 pt-3">
           <div className="flex items-center justify-between">
@@ -312,7 +339,10 @@ export default function MediaManager({
                   {img.path.split('/').pop()}
                 </span>
                 <button
-                  onClick={(e) => removeFromVideo(img.path, e)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onImagesChange(selectedImages.filter(i => i.path !== img.path));
+                  }}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
                   <X className="w-3 h-3" />
@@ -320,19 +350,6 @@ export default function MediaManager({
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Mensagem quando não há imagens */}
-      {!isLoading && availableImages.length === 0 && (
-        <div className="text-center py-6 rounded-lg border border-dashed border-gray-700">
-          <ImageIcon className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-          <p className="text-xs text-gray-500">
-            Nenhuma mídia carregada
-          </p>
-          <p className="text-[10px] text-gray-600">
-            Clique em "Upload Mídia" para adicionar
-          </p>
         </div>
       )}
     </div>

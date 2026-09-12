@@ -1,4 +1,4 @@
-// app/api/tts/generate/route.ts - Versão sem reference_id
+// app/api/tts/generate/route.ts
 import { NextResponse } from 'next/server';
 import {
   TTS_CONFIG,
@@ -8,7 +8,9 @@ import {
 } from '@/lib/tts';
 import fs from 'fs';
 import path from 'path';
+import { exec } from 'child_process';
 
+// Salvar áudio localmente
 async function saveAudioToFile(audioBuffer: Buffer, filename: string): Promise<string> {
   const audioDir = path.join(process.cwd(), 'public', 'audio', 'tts');
 
@@ -22,12 +24,53 @@ async function saveAudioToFile(audioBuffer: Buffer, filename: string): Promise<s
   return `/audio/tts/${filename}`;
 }
 
+// Obter duração do áudio com ffprobe
+function getAudioDuration(filePath: string): Promise<number> {
+  return new Promise((resolve) => {
+    if (!fs.existsSync(filePath)) {
+      resolve(0);
+      return;
+    }
+
+    const ffprobe = exec(
+      `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${filePath}"`,
+      (error, stdout) => {
+        if (error || !stdout) {
+          resolve(0);
+          return;
+        }
+        const duration = parseFloat(stdout.trim());
+        if (isNaN(duration) || duration <= 0) {
+          resolve(0);
+        } else {
+          resolve(duration);
+        }
+      }
+    );
+
+    setTimeout(() => {
+      try {
+        ffprobe.kill();
+      } catch (e) { }
+      resolve(0);
+    }, 5000);
+  });
+}
+
+// Sanitizar nome do arquivo (remover caracteres inválidos)
+function sanitizeFileName(text: string): string {
+  return text
+    .replace(/[^a-zA-Z0-9À-ÿ\s]/g, '')
+    .replace(/\s+/g, '_')
+    .trim()
+    .substring(0, 30);
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { text, voice, rate = 0, pitch = 0 } = body;
 
-    // Verificar se a API está configurada
     if (!isTTSConfigured()) {
       return NextResponse.json(
         {
@@ -38,7 +81,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validar texto
     const validation = validateTTSText(text);
     if (!validation.valid) {
       return NextResponse.json(
@@ -50,29 +92,24 @@ export async function POST(req: Request) {
     const formattedText = formatTextForTTS(text);
     const voiceId = voice || TTS_CONFIG.DEFAULT_VOICE;
 
+    // Gerar nome baseado no texto (30 primeiros caracteres)
+    const namePrefix = sanitizeFileName(formattedText);
+
     console.log(`🎤 Gerando TTS via Fish Audio API:`);
     console.log(`📝 Texto: "${formattedText.substring(0, 50)}..."`);
     console.log(`🔊 Voz: ${voiceId}`);
-    console.log(`📦 Modelo: ${TTS_CONFIG.MODEL}`);
-
-    // ============================================
-    // CORPO DA REQUISIÇÃO SEM reference_id
-    // ============================================
+    console.log(`📛 Nome base: "${namePrefix}"`);
 
     const apiUrl = 'https://api.fish.audio/v1/tts';
 
-    // Corpo da requisição - NÃO enviar reference_id para usar voz padrão
     const requestBody: any = {
       text: formattedText,
       format: 'mp3',
     };
 
-    // Só adicionar reference_id se for um ID válido e diferente do padrão
-    if (voiceId && voiceId !== 'default') {
+    if (voiceId && voiceId !== 'default' && voiceId.length > 8) {
       requestBody.reference_id = voiceId;
     }
-
-    console.log(`📤 Enviando:`, JSON.stringify(requestBody, null, 2));
 
     const response = await fetch(apiUrl, {
       method: 'POST',
@@ -126,20 +163,27 @@ export async function POST(req: Request) {
     }
 
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    const filename = `tts_${timestamp}_${random}.mp3`;
+    const random = Math.random().toString(36).substring(2, 6);
+    const filename = `${namePrefix}_${timestamp}_${random}.mp3`;
 
     const audioPath = await saveAudioToFile(audioBuffer, filename);
     const fileSize = audioBuffer.length;
 
+    // Obter duração do áudio
+    const fullPath = path.join(process.cwd(), 'public', audioPath);
+    const duration = await getAudioDuration(fullPath);
+
     console.log(`✅ TTS gerado: ${filename}`);
     console.log(`📁 Tamanho: ${(fileSize / 1024).toFixed(1)}KB`);
+    console.log(`⏱️ Duração: ${duration.toFixed(2)}s`);
 
     return NextResponse.json({
       success: true,
       audioPath,
       filename,
-      duration: 0,
+      name: `${namePrefix}.mp3`,
+      displayName: namePrefix,
+      duration: duration,
       size: fileSize,
       voice: voiceId || 'default',
       text: formattedText,

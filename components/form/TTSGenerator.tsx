@@ -32,9 +32,6 @@ interface TTSAudioFile {
   text?: string;
 }
 
-const MAX_VISIBLE_ITEMS = 10;
-const ITEM_HEIGHT = 44;
-
 export default function TTSGenerator({
   onAudioGenerated,
   onAudioRemove,
@@ -52,6 +49,8 @@ export default function TTSGenerator({
   const [selectedTtsPath, setSelectedTtsPath] = useState<string | null>(selectedAudioPath);
   const [error, setError] = useState<string | null>(null);
   const [isApiConfigured, setIsApiConfigured] = useState(true);
+  const [isLoadingAudios, setIsLoadingAudios] = useState(true);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -77,20 +76,55 @@ export default function TTSGenerator({
   }, []);
 
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadTtsAudios();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    loadTtsAudios();
+  }, []);
+
+  useEffect(() => {
     setSelectedTtsPath(selectedAudioPath);
   }, [selectedAudioPath]);
 
   const loadTtsAudios = async () => {
     try {
-      const response = await fetch("/api/tts/list");
+      setIsLoadingAudios(true);
+      console.log('📂 Carregando lista de áudios TTS...');
+
+      const response = await fetch("/api/tts/list", {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+        },
+      });
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.audios) {
+          console.log(`✅ ${data.audios.length} áudios TTS carregados`);
           setTtsAudios(data.audios);
         }
+      } else {
+        console.warn(`⚠️ Erro ao carregar áudios (${response.status})`);
       }
     } catch (error) {
-      console.error("❌ Erro ao carregar áudios TTS:", error);
+      console.warn("⚠️ Erro ao carregar áudios TTS");
+    } finally {
+      setIsLoadingAudios(false);
+      setHasLoadedOnce(true);
     }
   };
 
@@ -209,13 +243,13 @@ export default function TTSGenerator({
 
   const cleanAudioName = (name: string): string => {
     let cleaned = name;
+
     cleaned = cleaned.replace(/\.(mp3|wav|ogg|m4a)$/i, '');
-    cleaned = cleaned.replace(/^tts_/i, '');
-    cleaned = cleaned.replace(/^\d+_/, '');
-    cleaned = cleaned.replace(/_\d{10,}_[a-z0-9]{6,}$/i, '');
+    cleaned = cleaned.replace(/_\d{10,}_[a-z0-9]{4,}$/i, '');
     cleaned = cleaned.replace(/_\d{10,}$/, '');
     cleaned = cleaned.replace(/_/g, ' ');
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
     return cleaned || name;
   };
 
@@ -226,16 +260,13 @@ export default function TTSGenerator({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const maxHeight = MAX_VISIBLE_ITEMS * ITEM_HEIGHT;
-  const showScroll = ttsAudios.length > MAX_VISIBLE_ITEMS;
-
   return (
     <div className="space-y-4">
       {/* Área de texto */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
-            <Mic className="w-4 h-4 text-purple-400" />
+            <Mic className="w-4 h-4 text-pink-400" />
             Texto para Voz
           </label>
           <span className={`text-xs ${charCount > 5000 ? 'text-red-400' : 'text-gray-400'}`}>
@@ -248,7 +279,7 @@ export default function TTSGenerator({
             onChange={(e) => setText(e.target.value)}
             placeholder="Digite o texto que você quer transformar em voz..."
             disabled={disabled || isGenerating}
-            className="w-full h-24 rounded-lg bg-gray-800/50 border border-gray-700/50 p-3 text-white text-sm placeholder-gray-500 focus:border-purple-500/50 focus:outline-none resize-none pr-8"
+            className="w-full h-24 rounded-lg bg-gray-800/50 border border-gray-700/50 p-3 text-white text-sm placeholder-gray-500 focus:border-pink-500/50 focus:outline-none resize-none pr-8"
           />
           {text && !isGenerating && (
             <button
@@ -273,7 +304,7 @@ export default function TTSGenerator({
             value={voice}
             onChange={(e) => setVoice(e.target.value)}
             disabled={disabled || isGenerating || isLoading}
-            className="w-full px-3 py-2 rounded-lg bg-gray-800/50 border border-gray-700/50 text-white text-sm focus:border-purple-500/50 focus:outline-none"
+            className="w-full px-3 py-2 rounded-lg bg-gray-800/50 border border-gray-700/50 text-white text-sm focus:border-pink-500/50 focus:outline-none"
           >
             {Object.entries(voices).map(([key, voiceData]) => (
               <option key={key} value={key}>
@@ -295,7 +326,7 @@ export default function TTSGenerator({
             value={rate}
             onChange={(e) => setRate(Number(e.target.value))}
             disabled={disabled || isGenerating}
-            className="w-full accent-purple-400"
+            className="w-full accent-pink-400"
           />
           <div className="flex justify-between text-[10px] text-gray-500">
             <span>Lento</span>
@@ -315,7 +346,7 @@ export default function TTSGenerator({
             value={pitch}
             onChange={(e) => setPitch(Number(e.target.value))}
             disabled={disabled || isGenerating}
-            className="w-full accent-purple-400"
+            className="w-full accent-pink-400"
           />
           <div className="flex justify-between text-[10px] text-gray-500">
             <span>Grave</span>
@@ -378,25 +409,26 @@ export default function TTSGenerator({
         </div>
       )}
 
-      {/* Lista de Áudios TTS Gerados */}
-      {ttsAudios.length > 0 && (
-        <div className="space-y-2 border-t border-gray-700/50 pt-3">
-          <div className="flex items-center justify-between">
-            <label className="text-[10px] text-gray-400 uppercase tracking-wider flex items-center gap-1">
-              <Music className="w-3 h-3" />
-              Vozes Geradas ({ttsAudios.length})
-            </label>
-            <span className="text-[10px] text-gray-500">
-              {selectedTtsPath ? "1 selecionado" : "Nenhum selecionado"}
-            </span>
-          </div>
-          <div
-            className="space-y-1 pr-1"
-            style={{
-              maxHeight: showScroll ? `${maxHeight}px` : 'none',
-              overflowY: showScroll ? 'auto' : 'visible',
-            }}
-          >
+      {/* Lista de Áudios TTS Gerados - SEM BARRA DE ROLAGEM */}
+      <div className="space-y-2 border-t border-gray-700/50 pt-3">
+        <div className="flex items-center justify-between">
+          <label className="text-[10px] text-gray-400 uppercase tracking-wider flex items-center gap-1">
+            <Music className="w-3 h-3" />
+            Vozes Geradas ({ttsAudios.length})
+            {isLoadingAudios && (
+              <span className="ml-1 text-pink-400 animate-pulse normal-case">
+                Carregando...
+              </span>
+            )}
+          </label>
+          <span className="text-[10px] text-gray-500">
+            {selectedTtsPath ? "1 selecionado" : "Nenhum selecionado"}
+          </span>
+        </div>
+
+        {/* Lista de áudios ou mensagem vazia - SEM SCROLL */}
+        {ttsAudios.length > 0 ? (
+          <div className="space-y-1">
             {ttsAudios.map((audio) => {
               const selected = isSelected(audio.path);
               const cleanedName = cleanAudioName(audio.name);
@@ -416,17 +448,23 @@ export default function TTSGenerator({
                   onClick={() => !disabled && handleSelectAudio(audio.path)}
                 >
                   <Music className={`w-4 h-4 flex-shrink-0 ${selected ? "text-purple-400" : "text-gray-400"}`} />
+
                   {durationFormatted && (
                     <span className="text-[10px] text-gray-500 flex-shrink-0 font-mono">
                       {durationFormatted}
                     </span>
                   )}
+
                   <span className="flex-1 text-xs text-gray-300 truncate">
-                    {cleanedName.length > 28 ? cleanedName.substring(0, 28) + '...' : cleanedName}
+                    {cleanedName.length > 30
+                      ? cleanedName.substring(0, 30) + '...'
+                      : cleanedName}
                   </span>
+
                   {selected && (
                     <Check className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
                   )}
+
                   <button
                     onClick={(e) => handleDeleteAudio(audio.path, e)}
                     disabled={disabled}
@@ -438,11 +476,20 @@ export default function TTSGenerator({
               );
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          !isLoadingAudios && (
+            <div className="text-center py-4 rounded-lg border border-dashed border-gray-700/50">
+              <Music className="w-6 h-6 text-gray-600 mx-auto mb-1" />
+              <p className="text-[10px] text-gray-500">
+                Nenhuma voz gerada ainda
+              </p>
+            </div>
+          )
+        )}
+      </div>
 
       {/* Dicas */}
-      {!text && !isGenerating && isApiConfigured && ttsAudios.length === 0 && (
+      {!text && !isGenerating && isApiConfigured && ttsAudios.length === 0 && !isLoadingAudios && (
         <div className="flex items-start gap-2 p-2 rounded-lg bg-blue-500/5 border border-blue-500/10">
           <Sparkles className="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0" />
           <p className="text-[10px] text-gray-400 leading-relaxed">

@@ -72,6 +72,7 @@ export default function VideoSizeBar({
     }
   }, [platform, width, height]);
 
+  // CORREÇÃO: Não fecha a barra ao selecionar uma plataforma
   const handlePlatformClick = (p: Platform) => {
     if (disabled) return;
 
@@ -82,13 +83,13 @@ export default function VideoSizeBar({
       setIsCustom(false);
       onChange(p.id, p.width, p.height);
     }
-    setIsOpen(false);
+    // Removido: setIsOpen(false) - a barra permanece aberta
   };
 
   const handleCustomApply = () => {
     if (customWidth > 0 && customHeight > 0) {
       onChange("custom", customWidth, customHeight);
-      setIsOpen(false);
+      // Removido: setIsOpen(false) - a barra permanece aberta
     }
   };
 
@@ -134,8 +135,8 @@ export default function VideoSizeBar({
       {/* Conteúdo expansível */}
       {isOpen && (
         <div className="space-y-3 pt-2 border-t border-white/5">
-          {/* Grid de plataformas */}
-          <div className="grid grid-cols-4 gap-1.5">
+          {/* Grid de plataformas - 4 colunas em mobile, 6 colunas em desktop */}
+          <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
             {platforms.map((p) => {
               const Icon = p.icon;
               const isActive = platform === p.id;
@@ -147,7 +148,7 @@ export default function VideoSizeBar({
                   onClick={() => handlePlatformClick(p)}
                   disabled={disabled}
                   className={`
-                    flex flex-col items-center justify-center gap-0.5 px-1 py-2 rounded-lg text-[9px] font-medium transition-all relative
+                    flex flex-col items-center justify-center gap-0.5 px-1 py-2 rounded-lg font-medium transition-all relative
                     ${isActive
                       ? "bg-purple-600/30 text-white border border-purple-500/30 shadow-lg shadow-purple-900/20"
                       : "text-gray-400 hover:text-white hover:bg-white/5 border border-transparent"
@@ -157,13 +158,21 @@ export default function VideoSizeBar({
                   `}
                   title={p.label}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? "text-purple-400" : "text-gray-500"}`} />
-                  <span className="leading-tight text-[8px] sm:text-[9px]">{p.label}</span>
+                  {/* Ícone e texto - tamanho responsivo */}
+                  <Icon className={`
+                    w-4 h-4 sm:w-5 sm:h-5 
+                    ${isActive ? "text-purple-400" : "text-gray-500"}
+                  `} />
+                  <span className="leading-tight text-[8px] sm:text-[10px]">
+                    {p.label}
+                  </span>
                   {!isCustomPlatform && (
-                    <span className="text-[6px] sm:text-[7px] opacity-50">{p.width}×{p.height}</span>
+                    <span className="text-[6px] sm:text-[8px] opacity-50">
+                      {p.width}×{p.height}
+                    </span>
                   )}
                   {isActive && !isCustomPlatform && (
-                    <Check className="w-2.5 h-2.5 text-purple-400 absolute -top-1 -right-1" />
+                    <Check className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-purple-400 absolute -top-1 -right-1" />
                   )}
                 </button>
               );

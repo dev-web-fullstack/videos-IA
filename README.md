@@ -1,19 +1,28 @@
 # 🎬 Videos IA
 
-Gerador de vídeos personalizados com texto, imagem, áudio e background gerado por IA.
+Gerador de vídeos personalizados com texto, imagens, áudio e fundo gerado por IA.
+
+> Desenvolvido com o auxílio do **[DeepSeek](https://deepseek.com)**.
 
 ---
 
-## 🚀 O que faz?
+## ✨ O que faz
 
-- Cria vídeos a partir de qualquer texto
-- Personaliza fonte, cor, tamanho, contorno e sombra
-- Gera fundo automaticamente com IA baseado no texto
-- Alinha o texto (esquerda, centro, direita, justificado)
-- Posiciona verticalmente (cima, centro, baixo)
-- Preview em tempo real
-- Download do vídeo com exclusão automática do servidor
-- Adicionar audio wav e mp3
+- Cria vídeos a partir de texto com estilo personalizável
+- Gera voz a partir de texto (Text-to-Speech)
+- Cria fundos com IA ou cor sólida
+- Adiciona imagens e áudios ao vídeo
+- Preview em tempo real e download automático
+
+---
+
+## 🔌 APIs utilizadas
+
+| Ferramenta | Uso | Custo |
+|-----------|-----|-------|
+| **Fish Audio** | Gerar voz (TTS) | Grátis (requer chave) |
+| **Pollinations.ai** | Gerar imagens IA | Grátis (sem chave) |
+| **Freesound** | Biblioteca de sons | Grátis (requer chave) |
 
 ---
 
@@ -51,3 +60,7 @@ npm run download-fonts
 
 # Execute o projeto
 npm run dev
+
+# Criar arquivo .env.local ma raiz
+FISH_AUDIO_API_KEY=sua_chave_aqui
+FREESOUND_API_KEY=sua_chave_aqui
